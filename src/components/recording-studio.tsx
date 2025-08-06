@@ -51,78 +51,113 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         clearInterval(recordingTimerRef.current);
       }
     };
-  }, []);
+  }, [mediaStream]);
 
   const requestPermissions = async () => {
     try {
+      console.log("Requesting camera and microphone permissions...");
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+        video: { width: 1280, height: 720, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true }
       });
+      console.log("Permissions granted, stream obtained:", stream);
       setMediaStream(stream);
       setHasPermissions(true);
+      
+      // Set video source after stream is ready
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        console.log("Video element connected to stream");
       }
     } catch (error) {
-      console.error("Permission denied:", error);
+      console.error("Permission denied or error:", error);
+      setHasPermissions(false);
     }
   };
 
   const startRecording = () => {
-    if (!mediaStream) return;
+    if (!mediaStream) {
+      console.error("No media stream available for recording");
+      return;
+    }
 
-    const mediaRecorder = new MediaRecorder(mediaStream);
-    const chunks: Blob[] = [];
+    console.log("Starting recording...");
+    try {
+      const mediaRecorder = new MediaRecorder(mediaStream, {
+        mimeType: 'video/webm;codecs=vp9'
+      });
+      const chunks: Blob[] = [];
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const newRecording: Recording = {
-        questionIndex: currentQuestion,
-        question: questions[currentQuestion],
-        videoBlob: blob,
-        duration: recordingTime
+      mediaRecorder.ondataavailable = (event) => {
+        console.log("Recording data available:", event.data.size);
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
       };
-      
-      setRecordings(prev => [
-        ...prev.filter(r => r.questionIndex !== currentQuestion),
-        newRecording
-      ]);
-    };
 
-    mediaRecorderRef.current = mediaRecorder;
-    mediaRecorder.start();
-    setIsRecording(true);
-    setRecordingTime(0);
+      mediaRecorder.onstop = () => {
+        console.log("Recording stopped, creating blob...");
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const newRecording: Recording = {
+          questionIndex: currentQuestion,
+          question: questions[currentQuestion],
+          videoBlob: blob,
+          duration: recordingTime
+        };
+        
+        console.log("Recording created:", newRecording);
+        setRecordings(prev => [
+          ...prev.filter(r => r.questionIndex !== currentQuestion),
+          newRecording
+        ]);
+      };
 
-    recordingTimerRef.current = setInterval(() => {
-      setRecordingTime(prev => prev + 1);
-    }, 1000);
+      mediaRecorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event);
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(1000); // Record in 1-second chunks
+      setIsRecording(true);
+      setRecordingTime(0);
+      console.log("Recording started successfully");
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          const newTime = prev + 1;
+          console.log("Recording time:", newTime);
+          return newTime;
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+    }
   };
 
   const stopRecording = () => {
+    console.log("Stopping recording...");
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
       }
+      console.log("Recording stopped");
+    } else {
+      console.warn("No active recording to stop");
     }
   };
 
   const retakeRecording = () => {
+    console.log("Retaking recording for question", currentQuestion);
     setRecordings(prev => prev.filter(r => r.questionIndex !== currentQuestion));
     setRecordingTime(0);
   };
 
   const nextQuestion = () => {
     if (currentQuestion < questions.length - 1) {
+      console.log("Moving to next question:", currentQuestion + 1);
       setCurrentQuestion(prev => prev + 1);
       setRecordingTime(0);
     }
@@ -162,11 +197,15 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
             <h3 className="text-xl font-display font-semibold">Camera & Microphone Access</h3>
             <p className="text-muted-foreground">
               We need access to your camera and microphone to record your interview responses.
+              Click "Grant Permissions" and allow access when prompted by your browser.
             </p>
           </div>
-          <Button variant="hero" onClick={requestPermissions}>
+          <Button variant="hero" onClick={requestPermissions} size="lg">
             Grant Permissions
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Your recordings are processed locally and securely
+          </p>
         </Card>
       </div>
     );
@@ -200,18 +239,38 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Video Preview */}
           <Card className="p-6 space-y-6">
-            <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
+            <div className="aspect-video bg-black rounded-lg overflow-hidden relative group">
               <video
                 ref={videoRef}
                 autoPlay
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => {
+                  console.log("Video metadata loaded");
+                  if (videoRef.current) {
+                    videoRef.current.play().catch(console.error);
+                  }
+                }}
               />
+              {!hasPermissions && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="text-white text-center">
+                    <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Requesting camera access...</p>
+                  </div>
+                </div>
+              )}
               {isRecording && (
-                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-medium">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-medium animate-pulse">
+                  <div className="w-2 h-2 bg-white rounded-full" />
                   REC {formatTime(recordingTime)}
+                </div>
+              )}
+              {currentRecording && !isRecording && (
+                <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1 bg-green-500 text-white rounded-full text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Recorded
                 </div>
               )}
             </div>
