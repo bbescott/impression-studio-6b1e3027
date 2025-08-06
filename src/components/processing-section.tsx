@@ -73,7 +73,7 @@ export function ProcessingSection({ recordings, goal, onStartOver }: ProcessingS
       try {
         await navigator.share({
           title: 'My AI Interview',
-          text: `Check out my professional interview created with AI Personal Podcast Studio!`,
+          text: `Check out my professional interview created with Impression Studio!`,
           url: window.location.origin,
         });
       } catch (error) {
@@ -109,7 +109,7 @@ export function ProcessingSection({ recordings, goal, onStartOver }: ProcessingS
               Your Interview is Ready!
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              We've created a professional podcast-style video with AI-generated 
+              We've created a professional interview video with AI-generated 
               interviewer questions and your responses.
             </p>
           </div>
@@ -196,7 +196,7 @@ export function ProcessingSection({ recordings, goal, onStartOver }: ProcessingS
           </h1>
           <p className="text-xl text-muted-foreground">
             Our AI is processing your responses and creating a professional 
-            podcast-style interview video.
+            interview video.
           </p>
         </div>
 

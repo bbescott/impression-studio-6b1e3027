@@ -26,12 +26,12 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 border border-border backdrop-blur-sm">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">AI-Powered Podcast Studio</span>
+            <span className="text-sm font-medium">AI-Powered Interview Studio</span>
           </div>
           
           {/* Main Heading */}
           <h1 className="text-5xl md:text-7xl font-display font-bold bg-gradient-to-br from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent leading-tight">
-            Create Professional
+            Impression Studio
             <br />
             <span className="bg-gradient-primary bg-clip-text text-transparent">
               AI Interviews
@@ -40,7 +40,7 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
           
           {/* Subheading */}
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Answer AI-generated questions and get a polished podcast-style video
+            Answer AI-generated questions and get a polished interview video
             perfect for job applications, dating profiles, and personal branding.
           </p>
           
