@@ -51,7 +51,7 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         clearInterval(recordingTimerRef.current);
       }
     };
-  }, [mediaStream]);
+  }, []); // Only run once on mount
 
   const requestPermissions = async () => {
     try {
