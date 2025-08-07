@@ -51,7 +51,15 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         clearInterval(recordingTimerRef.current);
       }
     };
-  }, []); // Only run once on mount
+  }, []);
+
+  // Separate effect to connect video element when stream is ready
+  useEffect(() => {
+    if (mediaStream && videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      console.log("Video element connected to stream");
+    }
+  }, [mediaStream]);
 
   const requestPermissions = async () => {
     try {
@@ -63,12 +71,6 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
       console.log("Permissions granted, stream obtained:", stream);
       setMediaStream(stream);
       setHasPermissions(true);
-      
-      // Set video source after stream is ready
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        console.log("Video element connected to stream");
-      }
     } catch (error) {
       console.error("Permission denied or error:", error);
       setHasPermissions(false);
