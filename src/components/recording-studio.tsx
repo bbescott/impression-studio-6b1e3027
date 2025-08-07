@@ -102,16 +102,21 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         console.log("Recording stopped, creating blob...");
         const blob = new Blob(chunks, { type: 'video/webm' });
         
-        console.log("Final recording duration:", capturedDuration);
+        // Get the duration that was stored when stopping
+        const finalDuration = (mediaRecorder as any).finalDuration || 0;
+        console.log("Final recording duration from stored value:", finalDuration);
+        console.log("Blob size:", blob.size, "bytes");
+        console.log("Blob type:", blob.type);
         
         const newRecording: Recording = {
           questionIndex: currentQuestion,
           question: questions[currentQuestion],
           videoBlob: blob,
-          duration: capturedDuration
+          duration: finalDuration
         };
         
         console.log("Recording created:", newRecording);
+        console.log("Video blob URL:", URL.createObjectURL(blob));
         setRecordings(prev => [
           ...prev.filter(r => r.questionIndex !== currentQuestion),
           newRecording
@@ -150,13 +155,20 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
   const stopRecording = () => {
     console.log("Stopping recording...");
     if (mediaRecorderRef.current && isRecording) {
+      // Capture the duration BEFORE stopping
+      const finalDuration = recordingTime;
+      console.log("Capturing duration before stop:", finalDuration);
+      
+      // Store the duration on the mediaRecorder for the onstop callback
+      (mediaRecorderRef.current as any).finalDuration = finalDuration;
+      
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
-      console.log("Recording stopped");
+      console.log("Recording stopped with duration:", finalDuration);
     } else {
       console.warn("No active recording to stop");
     }
