@@ -100,11 +100,16 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, creating blob...");
         const blob = new Blob(chunks, { type: 'video/webm' });
+        
+        // Capture the current recording time before resetting
+        const finalDuration = recordingTime;
+        console.log("Final recording duration:", finalDuration);
+        
         const newRecording: Recording = {
           questionIndex: currentQuestion,
           question: questions[currentQuestion],
           videoBlob: blob,
-          duration: recordingTime
+          duration: finalDuration
         };
         
         console.log("Recording created:", newRecording);
@@ -173,6 +178,7 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
   };
 
   const completeSession = () => {
+    console.log("Completing session with recordings:", recordings);
     onComplete(recordings);
   };
 
