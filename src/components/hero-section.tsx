@@ -50,7 +50,7 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
               <Play className="w-5 h-5 transition-transform group-hover:scale-110" />
               Start Recording
             </Button>
-            <Button variant="outline" size="xl">
+            <Button variant="outline" size="xl" onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')}>
               <Video className="w-5 h-5" />
               Watch Demo
             </Button>

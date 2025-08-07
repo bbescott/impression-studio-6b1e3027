@@ -49,10 +49,11 @@ export function ProcessingSection({ recordings, goal, onStartOver }: ProcessingS
       // Simulate final video creation
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Create a mock video URL (in real app, this would be the processed video)
-      const mockVideoBlob = new Blob(['mock video'], { type: 'video/mp4' });
-      const url = URL.createObjectURL(mockVideoBlob);
-      setVideoUrl(url);
+      // Create actual video from recordings (simplified version)
+      if (recordings.length > 0 && recordings[0].videoBlob) {
+        const url = URL.createObjectURL(recordings[0].videoBlob);
+        setVideoUrl(url);
+      }
       setIsComplete(true);
     };
 
