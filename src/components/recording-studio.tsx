@@ -89,6 +89,7 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         mimeType: 'video/webm;codecs=vp9'
       });
       const chunks: Blob[] = [];
+      let capturedDuration = 0;
 
       mediaRecorder.ondataavailable = (event) => {
         console.log("Recording data available:", event.data.size);
@@ -101,15 +102,13 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         console.log("Recording stopped, creating blob...");
         const blob = new Blob(chunks, { type: 'video/webm' });
         
-        // Capture the current recording time before resetting
-        const finalDuration = recordingTime;
-        console.log("Final recording duration:", finalDuration);
+        console.log("Final recording duration:", capturedDuration);
         
         const newRecording: Recording = {
           questionIndex: currentQuestion,
           question: questions[currentQuestion],
           videoBlob: blob,
-          duration: finalDuration
+          duration: capturedDuration
         };
         
         console.log("Recording created:", newRecording);
@@ -123,7 +122,10 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
         console.error("MediaRecorder error:", event);
       };
 
+      // Store reference to capture duration later
       mediaRecorderRef.current = mediaRecorder;
+      (mediaRecorderRef.current as any).capturedDuration = capturedDuration;
+      
       mediaRecorder.start(1000); // Record in 1-second chunks
       setIsRecording(true);
       setRecordingTime(0);
@@ -132,6 +134,10 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime(prev => {
           const newTime = prev + 1;
+          // Update the captured duration on the mediaRecorder
+          if (mediaRecorderRef.current) {
+            (mediaRecorderRef.current as any).capturedDuration = newTime;
+          }
           console.log("Recording time:", newTime);
           return newTime;
         });
