@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { generateInterviewPlan, type Persona } from "@/lib/ai";
 import { Briefcase, Heart, ArrowRight, CheckCircle2 } from "lucide-react";
 
 const goals = [
@@ -39,15 +44,59 @@ interface OnboardingSectionProps {
 }
 
 export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
+  const { toast } = useToast();
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+  const [topic, setTopic] = useState("");
+  const [persona, setPersona] = useState<Persona>("professional");
+  const [count, setCount] = useState<number>(5);
+  const [apiKey, setApiKey] = useState<string>(localStorage.getItem("PPLX_API_KEY") || "");
+  const [loading, setLoading] = useState(false);
 
   const handleGoalSelect = (goalId: string) => {
     setSelectedGoal(goalId);
-    const goal = goals.find(g => g.id === goalId);
-    if (goal) {
-      setTimeout(() => {
-        onGoalSelect(goalId, goal.questions);
-      }, 300);
+  };
+
+  const startInterview = async () => {
+    if (!selectedGoal) return;
+    const goal = goals.find((g) => g.id === selectedGoal)!;
+
+    try {
+      setLoading(true);
+      let questions: string[] = goal.questions;
+
+      if (apiKey) {
+        localStorage.setItem("PPLX_API_KEY", apiKey);
+        localStorage.setItem("INTERVIEW_PERSONA", persona);
+        localStorage.setItem("INTERVIEW_TOPIC", topic || goal.title);
+        localStorage.setItem("INTERVIEW_INTENT", selectedGoal === "job" ? "Job Seeking" : "Dating");
+        localStorage.setItem("INTERVIEW_COUNT", String(count));
+        const intent = selectedGoal === "job" ? "Job Seeking" : "Dating";
+        const aiQuestions = await generateInterviewPlan({
+          topic: topic || goal.title,
+          intent,
+          persona,
+          questionsCount: count,
+          apiKey,
+        });
+        if (aiQuestions?.length) questions = aiQuestions;
+      } else {
+        toast({
+          title: "Using sample questions",
+          description: "Add a Perplexity API key for AI-tailored questions.",
+        });
+      }
+
+      onGoalSelect(selectedGoal, questions);
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "AI generation failed",
+        description: e?.message || "Falling back to sample questions.",
+        variant: "destructive",
+      });
+      onGoalSelect(selectedGoal, goal.questions);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -129,6 +178,78 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
             );
           })}
         </div>
+
+        {selectedGoal && (
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            <Card className="p-6 space-y-4">
+              <h4 className="font-semibold">Interview Setup</h4>
+              <div className="space-y-2">
+                <Label htmlFor="topic">Topic or objective</Label>
+                <Input
+                  id="topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="e.g., Prepare for a Google PM interview"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Persona</Label>
+                  <Select value={persona} onValueChange={(v) => setPersona(v as Persona)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose persona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="flirty">Flirty</SelectItem>
+                      <SelectItem value="empathetic">Empathetic</SelectItem>
+                      <SelectItem value="philosophical">Philosophical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Questions</Label>
+                  <Select value={String(count)} onValueChange={(v) => setCount(parseInt(v, 10))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="5" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[3, 4, 5, 6, 7].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 space-y-4">
+              <h4 className="font-semibold">AI Settings</h4>
+              <p className="text-sm text-muted-foreground">
+                Enter your Perplexity API key to generate intelligent, adaptive questions. Stored locally only.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">Perplexity API Key</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="pplx_..."
+                />
+              </div>
+              <Button onClick={startInterview} variant="hero" disabled={loading} className="group">
+                {loading ? "Generating…" : "Start Interview"}
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+              {!apiKey && (
+                <p className="text-xs text-muted-foreground">No key? We'll use sample questions.</p>
+              )}
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { generateFollowUpQuestion, type Persona } from "@/lib/ai";
 import { 
   Mic, 
   MicOff, 
@@ -35,7 +38,15 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [hasPermissions, setHasPermissions] = useState(false);
+const [hasPermissions, setHasPermissions] = useState(false);
+  const [summaries, setSummaries] = useState<Record<number, string>>({});
+  const [questionOverrides, setQuestionOverrides] = useState<Record<number, string>>({});
+  const [apiKey, setApiKey] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+  const [persona, setPersona] = useState<Persona>(goal === 'dating' ? 'flirty' : 'professional');
+
+  const getQuestionText = (idx: number) => questionOverrides[idx] || questions[idx];
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -61,6 +72,11 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
     }
   }, [mediaStream]);
 
+  useEffect(() => {
+    const k = localStorage.getItem('PPLX_API_KEY') || '';
+    setApiKey(k);
+  }, []);
+
   const requestPermissions = async () => {
     try {
       console.log("Requesting camera and microphone permissions...");
@@ -85,12 +101,27 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
 
     console.log("Starting recording...");
     try {
-      const mediaRecorder = new MediaRecorder(mediaStream, {
-        mimeType: 'video/webm;codecs=vp9'
-      });
+      let mediaRecorder: MediaRecorder;
+      const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      let created = false;
+      for (const mt of mimeTypes) {
+        try {
+          mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mt });
+          console.log('MediaRecorder created with', mt);
+          created = true;
+          break;
+        } catch (e) {
+          console.warn('Failed to init MediaRecorder with', mt, e);
+        }
+      }
+      if (!created) {
+        mediaRecorder = new MediaRecorder(mediaStream);
+        console.log('MediaRecorder created with default options');
+      }
       const chunks: Blob[] = [];
-      let capturedDuration = 0;
 
+      let capturedDuration = 0;
+      
       mediaRecorder.ondataavailable = (event) => {
         console.log("Recording data available:", event.data.size);
         if (event.data.size > 0) {
@@ -212,6 +243,32 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleGenerateFollowUp = async () => {
+    if (!apiKey) {
+      toast({
+        title: "AI key required",
+        description: "Add your Perplexity API key in Onboarding.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const history = Array.from({ length: currentQuestion + 1 }, (_, i) => ({
+        question: getQuestionText(i),
+        summary: summaries[i] || '',
+      }));
+      const intent = goal === 'dating' ? 'Dating' : 'Job Seeking';
+      const nextQ = await generateFollowUpQuestion({ persona, intent, history, apiKey });
+      setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
+      toast({ title: "Next question updated", description: "AI tailored your next question." });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Follow-up failed", description: e?.message || "Try again later.", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   if (!hasPermissions) {
     return (
       <div className="min-h-screen flex items-center justify-center py-16 px-4">
@@ -346,7 +403,7 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
               
               <div className="p-4 bg-secondary rounded-lg">
                 <p className="text-lg leading-relaxed">
-                  {questions[currentQuestion]}
+                  {getQuestionText(currentQuestion)}
                 </p>
               </div>
             </div>
@@ -440,7 +497,7 @@ export function RecordingStudio({ questions, goal, onComplete, onBack }: Recordi
                     {recording && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                   </div>
                   <p className="text-muted-foreground line-clamp-2">
-                    {question}
+                    {getQuestionText(idx)}
                   </p>
                 </div>
               );
