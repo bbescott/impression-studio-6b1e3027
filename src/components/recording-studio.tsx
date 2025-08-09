@@ -351,7 +351,7 @@ const handleGenerateFollowUp = async () => {
           summary: summaries[i] || '',
         }));
         const intent = 'Interview';
-        const nextQ = await generateFollowUpQuestionWithGemini({ persona, intent, history, guidance });
+        const nextQ = await generateFollowUpQuestionWithGemini({ persona, intent, history });
         setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
         toast({ title: "Next question updated", description: "AI tailored your next question." });
       } catch (e: any) {
