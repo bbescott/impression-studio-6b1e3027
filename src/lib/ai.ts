@@ -124,14 +124,30 @@ export async function generateInterviewPlanWithGemini(params: {
   return (questions || []).slice(0, questionsCount);
 }
 
+export async function generateVideoPreferencesWithGemini(params: {
+  history: { question: string; summary: string }[];
+  guidance?: string;
+}): Promise<{ preferences: any | null; raw: string }>
+{
+  const { history, guidance } = params;
+  const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
+    body: { mode: 'preferences', history, guidance },
+  });
+  if (error) throw new Error(error.message || 'Gemini function error');
+  const preferences = (data as any)?.preferences ?? null;
+  const raw = (data as any)?.raw ?? '';
+  return { preferences, raw };
+}
+
 export async function generateFollowUpQuestionWithGemini(params: {
   persona: Persona;
   intent: string;
   history: { question: string; summary: string }[];
+  guidance?: string;
 }): Promise<string> {
-  const { persona, intent, history } = params;
+  const { persona, intent, history, guidance } = params;
   const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
-    body: { mode: 'followup', persona, intent, history },
+    body: { mode: 'followup', persona, intent, history, guidance },
   });
   if (error) throw new Error(error.message || 'Gemini function error');
   return ((data as any)?.question as string) || '';

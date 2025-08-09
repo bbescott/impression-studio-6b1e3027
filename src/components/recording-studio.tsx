@@ -4,18 +4,18 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { generateFollowUpQuestion, type Persona } from "@/lib/ai";
+import { generateFollowUpQuestion, generateFollowUpQuestionWithGemini, generateVideoPreferencesWithGemini, type Persona } from "@/lib/ai";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Mic, 
-  MicOff, 
   Video, 
-  VideoOff, 
   Play, 
   Pause, 
   RotateCcw, 
   ArrowRight,
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  Volume2
 } from "lucide-react";
 
 interface RecordingStudioProps {
@@ -44,7 +44,10 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const [apiKey, setApiKey] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
-  const [persona, setPersona] = useState<Persona>(goal === 'dating' ? 'flirty' : 'professional');
+  const [persona, setPersona] = useState<Persona>('professional');
+  const [guidance, setGuidance] = useState<string>("");
+  const [isPlayingTTS, setIsPlayingTTS] = useState<boolean>(false);
+  const defaultVoiceId = "9BWtsMINqrJLrRacOk9x"; // Aria
 
   const getQuestionText = (idx: number) => questionOverrides[idx] || questions[idx];
 
@@ -93,7 +96,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
     }
   };
 
-  const startRecording = () => {
+const startRecording = () => {
     if (!mediaStream) {
       console.error("No media stream available for recording");
       return;
@@ -226,8 +229,20 @@ const [hasPermissions, setHasPermissions] = useState(false);
     }
   };
 
-  const completeSession = () => {
+const completeSession = async () => {
     console.log("Completing session with recordings:", recordings);
+    try {
+      const history = questions.map((q, i) => ({ question: getQuestionText(i), summary: summaries[i] || '' }));
+      const { preferences, raw } = await generateVideoPreferencesWithGemini({ history, guidance });
+      if (preferences) {
+        localStorage.setItem('VIDEO_PREFERENCES', JSON.stringify(preferences));
+        console.log('Extracted video preferences:', preferences);
+      } else {
+        console.log('Raw preferences text:', raw);
+      }
+    } catch (e) {
+      console.error('Preference extraction failed', e);
+    }
     onComplete(recordings);
   };
 
@@ -243,13 +258,25 @@ const [hasPermissions, setHasPermissions] = useState(false);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleGenerateFollowUp = async () => {
+const handleGenerateFollowUp = async () => {
     if (!apiKey) {
-      toast({
-        title: "AI key required",
-        description: "Add your Perplexity API key in Onboarding.",
-        variant: "destructive",
-      });
+      // Fallback to Gemini edge function
+      setIsGenerating(true);
+      try {
+        const history = Array.from({ length: currentQuestion + 1 }, (_, i) => ({
+          question: getQuestionText(i),
+          summary: summaries[i] || '',
+        }));
+        const intent = 'Interview';
+        const nextQ = await generateFollowUpQuestionWithGemini({ persona, intent, history, guidance });
+        setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
+        toast({ title: "Next question updated", description: "AI tailored your next question." });
+      } catch (e: any) {
+        console.error(e);
+        toast({ title: "Follow-up failed", description: e?.message || "Try again later.", variant: "destructive" });
+      } finally {
+        setIsGenerating(false);
+      }
       return;
     }
     setIsGenerating(true);
@@ -259,7 +286,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
         summary: summaries[i] || '',
       }));
       const intent = goal === 'dating' ? 'Dating' : 'Job Seeking';
-      const nextQ = await generateFollowUpQuestion({ persona, intent, history, apiKey });
+      const nextQ = await generateFollowUpQuestion({ persona, intent, history, apiKey, guidance });
       setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
       toast({ title: "Next question updated", description: "AI tailored your next question." });
     } catch (e: any) {
@@ -300,12 +327,12 @@ const [hasPermissions, setHasPermissions] = useState(false);
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-            Back to Goals
+             <ArrowLeft className="w-4 h-4" />
+             Back to Setup
           </Button>
           <div className="text-center">
             <h1 className="text-2xl font-display font-semibold">Recording Studio</h1>
-            <p className="text-muted-foreground capitalize">{goal} Interview</p>
+            <p className="text-muted-foreground">{goal}</p>
           </div>
           <div className="w-24" /> {/* Spacer */}
         </div>
@@ -359,7 +386,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
             </div>
 
             {/* Recording Controls */}
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-4 flex-wrap">
               <Button
                 variant={isRecording ? "destructive" : "hero"}
                 size="lg"
@@ -377,6 +404,29 @@ const [hasPermissions, setHasPermissions] = useState(false);
                     Start Recording
                   </>
                 )}
+              </Button>
+
+              <Button variant="outline" onClick={async () => {
+                try {
+                  setIsPlayingTTS(true);
+                  const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+                    body: { text: getQuestionText(currentQuestion), voiceId: defaultVoiceId },
+                  });
+                  if (error) throw new Error(error.message);
+                  const audioBase64 = (data as any)?.audioContent as string;
+                  if (audioBase64) {
+                    const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+                    await audio.play();
+                  }
+                } catch (e: any) {
+                  console.error(e);
+                  toast({ title: 'Could not play AI voice', description: e?.message || 'Try again later', variant: 'destructive' });
+                } finally {
+                  setIsPlayingTTS(false);
+                }
+              }}>
+                <Volume2 className="w-4 h-4" />
+                {isPlayingTTS ? 'Playing…' : 'Play Question (AI)'}
               </Button>
 
               {currentRecording && !isRecording && (
@@ -409,7 +459,37 @@ const [hasPermissions, setHasPermissions] = useState(false);
             </div>
 
             {/* Tips */}
-            <div className="space-y-3">
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                  Your Answer Summary (optional, not shared)
+                </h4>
+                <Textarea
+                  placeholder="Jot a 1-2 sentence summary of your answer. Used only to guide the AI."
+                  value={summaries[currentQuestion] || ''}
+                  onChange={(e) => setSummaries((prev) => ({ ...prev, [currentQuestion]: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                  Interviewer Feedback (style/voice)
+                </h4>
+                <Textarea
+                  placeholder="e.g., Be more energetic and concise. Keep it casual."
+                  value={guidance}
+                  onChange={(e) => setGuidance(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleGenerateFollowUp} disabled={isGenerating} className="flex-1">
+                    Tailor Next Question
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                  Recording Tips:
+                </h4>
               <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
                 Recording Tips:
               </h4>
