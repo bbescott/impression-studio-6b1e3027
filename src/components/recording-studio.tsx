@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { generateFollowUpQuestion, generateFollowUpQuestionWithGemini, generateVideoPreferencesWithGemini, type Persona } from "@/lib/ai";
 import { useConversation } from "@11labs/react";
 import { supabase } from "@/integrations/supabase/client";
+import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 import { 
   Mic, 
   Video, 
@@ -245,12 +246,8 @@ const startRecording = async () => {
     try {
       if (agentId) {
         setCurrentTranscript("");
-        const { data, error } = await supabase.functions.invoke('elevenlabs-signed-url', { body: { agentId } });
-        if (error) throw new Error(error.message);
-        const url = (data as any)?.signed_url || (data as any)?.url;
-        if (url) {
-          await conversation.startSession({ url });
-        }
+        // For public agents, we can connect with agentId directly
+        await conversation.startSession({ agentId });
       } else {
         toast({ title: 'Agent ID missing', description: 'Add ElevenLabs Agent ID to enable live transcription.', variant: 'destructive' });
       }
