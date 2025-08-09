@@ -53,6 +53,8 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const [voiceId, setVoiceId] = useState<string>("9BWtsMINqrJLrRacOk9x");
   const [agentId, setAgentId] = useState<string>(localStorage.getItem('ELEVENLABS_AGENT_ID') || "");
   const [currentTranscript, setCurrentTranscript] = useState<string>("");
+  const [agents, setAgents] = useState<{ id: string; name: string; description?: string; voiceId?: string }[]>([]);
+  const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [transcripts, setTranscripts] = useState<Record<number, string>>({});
   const VOICES = [
     { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
@@ -110,6 +112,33 @@ const [hasPermissions, setHasPermissions] = useState(false);
   useEffect(() => {
     if (agentId) localStorage.setItem('ELEVENLABS_AGENT_ID', agentId);
   }, [agentId]);
+
+  // Load ElevenLabs agents from Edge Function, fallback to curated list
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-get-agents');
+        if (error) throw new Error(error.message);
+        const apiAgents = (data as any)?.agents || [];
+        const curated = ELEVEN_AGENTS || [];
+        const merged = [
+          ...apiAgents,
+          ...curated.filter((c) => !apiAgents.some((a: any) => a.id === c.id)),
+        ];
+        if (!mounted) return;
+        setAgents(merged);
+        if (!agentId && merged[0]?.id) setAgentId(merged[0].id);
+      } catch (e: any) {
+        console.warn('Falling back to curated agents', e);
+        const curated = ELEVEN_AGENTS || [];
+        if (!mounted) return;
+        setAgents(curated);
+        if (!agentId && curated[0]?.id) setAgentId(curated[0].id);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
   const conversation = useConversation({
     overrides: {
       tts: { voiceId },
@@ -246,8 +275,17 @@ const startRecording = async () => {
     try {
       if (agentId) {
         setCurrentTranscript("");
-        // For public agents, we can connect with agentId directly
-        await conversation.startSession({ agentId });
+        try {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-signed-url', { body: { agentId } });
+          const url = (data as any)?.signed_url || (data as any)?.url;
+          if (!error && url) {
+            await (conversation as any).startSession({ url } as any);
+          } else {
+            await conversation.startSession({ agentId });
+          }
+        } catch {
+          await conversation.startSession({ agentId });
+        }
       } else {
         toast({ title: 'Agent ID missing', description: 'Add ElevenLabs Agent ID to enable live transcription.', variant: 'destructive' });
       }
@@ -665,17 +703,44 @@ const handleGenerateFollowUp = async () => {
                 {/* ElevenLabs Agent */}
                 <div className="space-y-3">
                   <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                    ElevenLabs Agent ID
+                    Interviewer Agent
                   </h4>
-                  <Input
-                    value={agentId}
-                    onChange={(e) => {
-                      setAgentId(e.target.value);
-                      localStorage.setItem('ELEVENLABS_AGENT_ID', e.target.value);
+                  <Select
+                    value={isCustomAgent ? "_custom" : (agentId || "")}
+                    onValueChange={(v) => {
+                      if (v === "_custom") {
+                        setIsCustomAgent(true);
+                        return;
+                      }
+                      setIsCustomAgent(false);
+                      setAgentId(v);
+                      const a = agents.find((x) => x.id === v);
+                      if (a?.voiceId) setVoiceId(a.voiceId);
                     }}
-                    placeholder="Enter your ElevenLabs Agent ID"
-                    aria-label="ElevenLabs Agent ID"
-                  />
+                  >
+                    <SelectTrigger aria-label="Select ElevenLabs Agent">
+                      <SelectValue placeholder={agents.length ? "Choose an agent" : "No agents available"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectLabel>Your Agents</SelectLabel>
+                      {agents.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                      <SelectLabel>Other</SelectLabel>
+                      <SelectItem value="_custom">Custom Agent ID…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {isCustomAgent && (
+                    <Input
+                      value={agentId}
+                      onChange={(e) => {
+                        setAgentId(e.target.value);
+                        localStorage.setItem('ELEVENLABS_AGENT_ID', e.target.value);
+                      }}
+                      placeholder="Enter your ElevenLabs Agent ID"
+                      aria-label="ElevenLabs Agent ID"
+                    />
+                  )}
                 </div>
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
