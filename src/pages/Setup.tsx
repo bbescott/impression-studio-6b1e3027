@@ -22,12 +22,11 @@ export default function Setup() {
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
 
-  const studios = [
+  const [studios, setStudios] = useState<string[]>([
     "/studios/studio-1.jpg",
     "/studios/studio-2.jpg",
     "/studios/studio-3.jpg",
-  ];
-
+  ]);
   // SEO tags
   useEffect(() => {
     document.title = "Setup Interview – Select Agent, Voice, Studio";
@@ -77,6 +76,30 @@ export default function Setup() {
           { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
           { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
         ]);
+      }
+    })();
+
+    // Fetch public studio images from Supabase Storage bucket
+    (async () => {
+      try {
+        const { data, error } = await supabase.storage.from('studio.sample.images').list('', {
+          limit: 100,
+          sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error) throw new Error(error.message);
+        if (!mounted) return;
+        const files = (data || []).filter((f: any) => f && f.name && /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+        if (files.length) {
+          const urls = files
+            .map((f: any) => supabase.storage.from('studio.sample.images').getPublicUrl(f.name).data.publicUrl)
+            .filter(Boolean);
+          if (urls.length) {
+            setStudios(urls);
+            if (!urls.includes(studio)) setStudio(urls[0]);
+          }
+        }
+      } catch (_) {
+        // keep default bundled images
       }
     })();
 

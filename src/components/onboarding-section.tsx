@@ -23,8 +23,19 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
 
   const startInterview = async () => {
     const topicValue = topic.trim() || "My Interview";
+
+    // Auto-select dating agent for dating-related topics
+    const DATING_AGENT_ID = "agent_3301k288cbm4ejmvsqrxkcnf16vk";
+    const isDatingTopic = /(\b|\s)(dating|relationship|romance|love)(\b|\s)/i.test(topicValue);
+
+    let selectedAgent = localStorage.getItem('ELEVENLABS_AGENT_ID') || undefined;
+    if (isDatingTopic && selectedAgent !== DATING_AGENT_ID) {
+      localStorage.setItem('ELEVENLABS_AGENT_ID', DATING_AGENT_ID);
+      selectedAgent = DATING_AGENT_ID;
+      toast({ title: "Dating topic detected", description: "Using your Dating Interviewer agent.", duration: 2500 });
+    }
+
     // Require agent selection before generating questions
-    const selectedAgent = localStorage.getItem('ELEVENLABS_AGENT_ID');
     if (!selectedAgent) {
       toast({ title: "Select an Interviewer Agent first", description: "Please complete setup before starting.", variant: "destructive" });
       navigate('/setup');
