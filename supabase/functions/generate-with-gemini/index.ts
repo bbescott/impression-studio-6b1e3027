@@ -60,7 +60,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const mode = (body?.mode as string) || "plan"; // "plan" | "followup"
+    const mode = (body?.mode as string) || "plan"; // "plan" | "followup" | "preferences"
     const persona = (body?.persona as string) || "professional";
     const personaNote = personaPrompts[persona] || personaPrompts.professional;
 
@@ -99,6 +99,40 @@ serve(async (req) => {
       const question = firstLine.replace(/^[-•\d.\s]+/, "").replace(/\s+/g, " ");
 
       return new Response(JSON.stringify({ question }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (mode === "preferences") {
+      const history = (body?.history as { question: string; summary: string }[]) || [];
+      const guidance = (body?.guidance as string) || "";
+
+      const convo = history
+        .map((h, i) => `Q${i + 1}: ${h.question}\nA${i + 1} (summary): ${h.summary}`)
+        .join("\n\n");
+
+      const system = "You are a senior video director assistant. Extract structured video production preferences from an interview conversation.";
+      const user = `Conversation so far:\n${convo}\n\nAdditional feedback from user (optional): ${guidance}\n\nReturn ONLY valid minified JSON with these fields when available: {"tone":"","pacing":"","visual_style":"","color_palette":"","aspect_ratio":"","caption_style":"","background":"","music":"","transitions":"","must_avoid":[],"unresolved_questions":[]}\n- If unknown, omit the field.\n- Do not include any extra text or markdown.`;
+
+      const raw = await callGemini(`${system}\n\n${user}`);
+
+      let preferences: any = null;
+      try {
+        preferences = JSON.parse(raw);
+      } catch (_) {
+        try {
+          const start = raw.indexOf('{');
+          const end = raw.lastIndexOf('}');
+          if (start !== -1 && end !== -1 && end > start) {
+            const snippet = raw.slice(start, end + 1);
+            preferences = JSON.parse(snippet);
+          }
+        } catch (e) {
+          preferences = null;
+        }
+      }
+
+      return new Response(JSON.stringify({ preferences, raw }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

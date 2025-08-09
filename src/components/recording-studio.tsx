@@ -285,8 +285,8 @@ const handleGenerateFollowUp = async () => {
         question: getQuestionText(i),
         summary: summaries[i] || '',
       }));
-      const intent = goal === 'dating' ? 'Dating' : 'Job Seeking';
-      const nextQ = await generateFollowUpQuestion({ persona, intent, history, apiKey, guidance });
+      const intent = 'Interview';
+      const nextQ = await generateFollowUpQuestion({ persona, intent, history, apiKey });
       setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
       toast({ title: "Next question updated", description: "AI tailored your next question." });
     } catch (e: any) {
