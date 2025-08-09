@@ -78,6 +78,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
     { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily" },
     { id: "pqHfZKP75CvOlQylNhV4", name: "Bill" },
   ];
+  const [voices, setVoices] = useState<{ id: string; name: string }[]>(VOICES);
 
   const getQuestionText = (idx: number) => questionOverrides[idx] || questions[idx];
 
@@ -139,6 +140,29 @@ const [hasPermissions, setHasPermissions] = useState(false);
     })();
     return () => { mounted = false };
   }, []);
+
+  // Load ElevenLabs shared voices from Edge Function, fallback to defaults
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices');
+        if (error) throw new Error(error.message);
+        const apiVoices = (data as any)?.voices || [];
+        if (!mounted) return;
+        if (apiVoices.length) {
+          setVoices(apiVoices);
+          if (!voiceId && apiVoices[0]?.id) setVoiceId(apiVoices[0].id);
+        }
+      } catch (e) {
+        console.warn('Falling back to default voices', e);
+        if (!mounted) return;
+        setVoices(VOICES);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
+
   const conversation = useConversation({
     overrides: {
       tts: { voiceId },
@@ -672,7 +696,7 @@ const handleGenerateFollowUp = async () => {
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>ElevenLabs Voices</SelectLabel>
-                          {VOICES.map((v) => (
+                          {voices.map((v) => (
                             <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                           ))}
                         </SelectGroup>
