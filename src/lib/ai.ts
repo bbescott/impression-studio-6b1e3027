@@ -1,5 +1,6 @@
 // Simple AI helper using Perplexity Chat Completions API
 // Stores no secrets; expects a user-provided API key (temporary) saved in localStorage under 'PPLX_API_KEY'
+import { supabase } from "@/integrations/supabase/client";
 
 export type Persona = 'professional' | 'flirty' | 'empathetic' | 'philosophical';
 
@@ -105,4 +106,33 @@ Instructions:
   // Ensure it's a single line question
   const firstLine = content.split('\n')[0].trim();
   return firstLine.replace(/^[-•\d.\s]+/, '').replace(/\s+/g, ' ');
+}
+
+// Server-side (Supabase Edge Function) Gemini helpers
+export async function generateInterviewPlanWithGemini(params: {
+  topic: string;
+  intent: string;
+  persona: Persona;
+  questionsCount?: number;
+}): Promise<string[]> {
+  const { topic, intent, persona, questionsCount = 5 } = params;
+  const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
+    body: { mode: 'plan', topic, intent, persona, questionsCount },
+  });
+  if (error) throw new Error(error.message || 'Gemini function error');
+  const questions = (data as any)?.questions as string[] | undefined;
+  return (questions || []).slice(0, questionsCount);
+}
+
+export async function generateFollowUpQuestionWithGemini(params: {
+  persona: Persona;
+  intent: string;
+  history: { question: string; summary: string }[];
+}): Promise<string> {
+  const { persona, intent, history } = params;
+  const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
+    body: { mode: 'followup', persona, intent, history },
+  });
+  if (error) throw new Error(error.message || 'Gemini function error');
+  return ((data as any)?.question as string) || '';
 }

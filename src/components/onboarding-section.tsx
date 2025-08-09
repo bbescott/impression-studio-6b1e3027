@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { generateInterviewPlan, type Persona } from "@/lib/ai";
+import { generateInterviewPlan, generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
 import { Briefcase, Heart, ArrowRight, CheckCircle2 } from "lucide-react";
 
 const goals = [
@@ -80,10 +80,28 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
         });
         if (aiQuestions?.length) questions = aiQuestions;
       } else {
-        toast({
-          title: "Using sample questions",
-          description: "Add a Perplexity API key for AI-tailored questions.",
-        });
+        // Use server-side Gemini via Supabase Edge Function (no client key needed)
+        localStorage.setItem("INTERVIEW_PERSONA", persona);
+        localStorage.setItem("INTERVIEW_TOPIC", topic || goal.title);
+        localStorage.setItem("INTERVIEW_INTENT", selectedGoal === "job" ? "Job Seeking" : "Dating");
+        localStorage.setItem("INTERVIEW_COUNT", String(count));
+        const intent = selectedGoal === "job" ? "Job Seeking" : "Dating";
+        try {
+          const aiQuestions = await generateInterviewPlanWithGemini({
+            topic: topic || goal.title,
+            intent,
+            persona,
+            questionsCount: count,
+          });
+          if (aiQuestions?.length) {
+            questions = aiQuestions;
+          } else {
+            toast({ title: "Using sample questions", description: "AI unavailable, showing samples." });
+          }
+        } catch (err) {
+          console.error(err);
+          toast({ title: "Using sample questions", description: "AI unavailable, showing samples." });
+        }
       }
 
       onGoalSelect(selectedGoal, questions);
