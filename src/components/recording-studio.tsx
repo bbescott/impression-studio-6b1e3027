@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectLabel } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFollowUpQuestion, generateFollowUpQuestionWithGemini, generateVideoPreferencesWithGemini, type Persona } from "@/lib/ai";
+import { useConversation } from "@11labs/react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Mic, 
@@ -48,6 +50,8 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const [persona, setPersona] = useState<Persona>('professional');
   const [isPlayingTTS, setIsPlayingTTS] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>("9BWtsMINqrJLrRacOk9x");
+  const [agentId, setAgentId] = useState<string>(localStorage.getItem('ELEVENLABS_AGENT_ID') || "");
+  const [currentTranscript, setCurrentTranscript] = useState<string>("");
   const [transcripts, setTranscripts] = useState<Record<number, string>>({});
   const VOICES = [
     { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
@@ -102,6 +106,29 @@ const [hasPermissions, setHasPermissions] = useState(false);
     const k = localStorage.getItem('PPLX_API_KEY') || '';
     setApiKey(k);
   }, []);
+  useEffect(() => {
+    if (agentId) localStorage.setItem('ELEVENLABS_AGENT_ID', agentId);
+  }, [agentId]);
+  const conversation = useConversation({
+    overrides: {
+      tts: { voiceId },
+    },
+    onMessage: (msg: any) => {
+      try {
+        const role = (msg as any)?.role || (msg as any)?.source;
+        const text = (msg as any)?.text || (msg as any)?.delta || (msg as any)?.message;
+        const isFinal = (msg as any)?.isFinal || (msg as any)?.final;
+        if (text && (role === 'user' || isFinal)) {
+          setCurrentTranscript((prev) => (prev ? `${prev} ${text}` : text));
+        }
+      } catch (e) {
+        console.log('ElevenLabs message parse', e, msg);
+      }
+    },
+    onError: (e: any) => {
+      console.error('ElevenLabs conv error', e);
+    },
+  });
 
   // Helpers for transcription and follow-up
   const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
@@ -155,6 +182,37 @@ const [hasPermissions, setHasPermissions] = useState(false);
     }
   };
 
+  const processFollowUpFromTranscript = async () => {
+    try {
+      const text = currentTranscript.trim();
+      toast({ title: "Analyzing answer…", description: "Preparing the next question." });
+
+      setTranscripts((prev) => ({ ...prev, [currentQuestion]: text || '' }));
+
+      const history = Array.from({ length: currentQuestion + 1 }, (_, i) => ({
+        question: getQuestionText(i),
+        summary: i === currentQuestion ? (text || '') : (prevTranscriptsRef.current[i] || ''),
+      }));
+
+      const nextQ = await generateFollowUpQuestionWithGemini({ persona, intent: 'Interview', history });
+      setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
+
+      const tts = await supabase.functions.invoke('elevenlabs-tts', {
+        body: { text: nextQ, voiceId },
+      });
+      const audioBase64 = (tts.data as any)?.audioContent as string;
+      if (audioBase64) {
+        const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+        await audio.play();
+      }
+      toast({ title: "Next question ready", description: "Tailored based on your last answer." });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Auto follow-up failed", description: e?.message || 'Try again later.', variant: 'destructive' });
+    } finally {
+      setCurrentTranscript("");
+    }
+  };
   // Keep a ref snapshot of transcripts to avoid stale closure inside async
   const prevTranscriptsRef = useRef<Record<number, string>>({});
   useEffect(() => {
@@ -177,10 +235,28 @@ const [hasPermissions, setHasPermissions] = useState(false);
     }
   };
 
-const startRecording = () => {
+const startRecording = async () => {
     if (!mediaStream) {
       console.error("No media stream available for recording");
       return;
+    }
+
+    // Start ElevenLabs Conversational AI session for live STT
+    try {
+      if (agentId) {
+        setCurrentTranscript("");
+        const { data, error } = await supabase.functions.invoke('elevenlabs-signed-url', { body: { agentId } });
+        if (error) throw new Error(error.message);
+        const url = (data as any)?.signed_url || (data as any)?.url;
+        if (url) {
+          await conversation.startSession({ url });
+        }
+      } else {
+        toast({ title: 'Agent ID missing', description: 'Add ElevenLabs Agent ID to enable live transcription.', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      console.error('Failed to start ElevenLabs session', err);
+      toast({ title: 'Live transcription failed to start', description: err?.message || 'Check your Agent ID.', variant: 'destructive' });
     }
 
     console.log("Starting recording...");
@@ -237,7 +313,7 @@ const startRecording = () => {
           newRecording
         ]);
         // Auto-transcribe and generate next question
-        transcribeAndGenerateFollowUp(blob);
+        processFollowUpFromTranscript();
       };
 
       mediaRecorder.onerror = (event) => {
@@ -269,16 +345,22 @@ const startRecording = () => {
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     console.log("Stopping recording...");
     if (mediaRecorderRef.current && isRecording) {
-      // Capture the duration BEFORE stopping
       const finalDuration = recordingTime;
       console.log("Capturing duration before stop:", finalDuration);
-      
+
+      // Attempt to end ElevenLabs session
+      try {
+        await conversation.endSession();
+      } catch (e) {
+        console.warn('Error ending ElevenLabs session', e);
+      }
+
       // Store the duration on the mediaRecorder for the onstop callback
       (mediaRecorderRef.current as any).finalDuration = finalDuration;
-      
+
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (recordingTimerRef.current) {
@@ -582,8 +664,22 @@ const handleGenerateFollowUp = async () => {
                     <Volume2 className="w-4 h-4" /> Preview
                   </Button>
                 </div>
-              </div>
-
+                </div>
+                {/* ElevenLabs Agent */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                    ElevenLabs Agent ID
+                  </h4>
+                  <Input
+                    value={agentId}
+                    onChange={(e) => {
+                      setAgentId(e.target.value);
+                      localStorage.setItem('ELEVENLABS_AGENT_ID', e.target.value);
+                    }}
+                    placeholder="Enter your ElevenLabs Agent ID"
+                    aria-label="ElevenLabs Agent ID"
+                  />
+                </div>
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
                   Recording Tips:
