@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectLabel } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFollowUpQuestion, generateFollowUpQuestionWithGemini, generateVideoPreferencesWithGemini, type Persona } from "@/lib/ai";
 import { useConversation } from "@11labs/react";
@@ -670,10 +670,12 @@ const handleGenerateFollowUp = async () => {
                         <SelectValue placeholder="Choose a voice" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectLabel>ElevenLabs Voices</SelectLabel>
-                        {VOICES.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          <SelectLabel>ElevenLabs Voices</SelectLabel>
+                          {VOICES.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
@@ -722,12 +724,16 @@ const handleGenerateFollowUp = async () => {
                       <SelectValue placeholder={agents.length ? "Choose an agent" : "No agents available"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectLabel>Your Agents</SelectLabel>
-                      {agents.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                      ))}
-                      <SelectLabel>Other</SelectLabel>
-                      <SelectItem value="_custom">Custom Agent ID…</SelectItem>
+                      <SelectGroup>
+                        <SelectLabel>Your Agents</SelectLabel>
+                        {agents.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Other</SelectLabel>
+                        <SelectItem value="_custom">Custom Agent ID…</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   {isCustomAgent && (
