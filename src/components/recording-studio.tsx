@@ -79,7 +79,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
     { id: "pqHfZKP75CvOlQylNhV4", name: "Bill" },
   ];
   const [voices, setVoices] = useState<{ id: string; name: string }[]>(VOICES);
-
+  const selectedStudio = typeof window !== 'undefined' ? (localStorage.getItem('SELECTED_STUDIO') || '') : '';
   const getQuestionText = (idx: number) => questionOverrides[idx] || questions[idx];
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -546,7 +546,7 @@ const handleGenerateFollowUp = async () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div className="min-h-screen py-8 px-4" style={selectedStudio ? { backgroundImage: `url(${selectedStudio})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
       <div className="container max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -682,96 +682,7 @@ const handleGenerateFollowUp = async () => {
               </div>
             </div>
 
-            {/* Interviewer Voice */}
-              <div className="space-y-3">
-                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                  Interviewer Voice
-                </h4>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <Select value={voiceId} onValueChange={setVoiceId}>
-                      <SelectTrigger aria-label="Select interviewer voice">
-                        <SelectValue placeholder="Choose a voice" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>ElevenLabs Voices</SelectLabel>
-                          {voices.map((v) => (
-                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button variant="outline" onClick={async () => {
-                    try {
-                      setIsPlayingTTS(true);
-                      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-                        body: { text: "Hi, I’ll be your interviewer voice.", voiceId },
-                      });
-                      if (error) throw new Error(error.message);
-                      const audioBase64 = (data as any)?.audioContent as string;
-                      if (audioBase64) {
-                        const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
-                        await audio.play();
-                      }
-                    } catch (e: any) {
-                      console.error(e);
-                      toast({ title: 'Could not preview voice', description: e?.message || 'Try again later', variant: 'destructive' });
-                    } finally {
-                      setIsPlayingTTS(false);
-                    }
-                  }}>
-                    <Volume2 className="w-4 h-4" /> Preview
-                  </Button>
-                </div>
-                </div>
-                {/* ElevenLabs Agent */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                    Interviewer Agent
-                  </h4>
-                  <Select
-                    value={isCustomAgent ? "_custom" : (agentId || "")}
-                    onValueChange={(v) => {
-                      if (v === "_custom") {
-                        setIsCustomAgent(true);
-                        return;
-                      }
-                      setIsCustomAgent(false);
-                      setAgentId(v);
-                      const a = agents.find((x) => x.id === v);
-                      if (a?.voiceId) setVoiceId(a.voiceId);
-                    }}
-                  >
-                    <SelectTrigger aria-label="Select ElevenLabs Agent">
-                      <SelectValue placeholder={agents.length ? "Choose an agent" : "No agents available"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Your Agents</SelectLabel>
-                        {agents.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Other</SelectLabel>
-                        <SelectItem value="_custom">Custom Agent ID…</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {isCustomAgent && (
-                    <Input
-                      value={agentId}
-                      onChange={(e) => {
-                        setAgentId(e.target.value);
-                        localStorage.setItem('ELEVENLABS_AGENT_ID', e.target.value);
-                      }}
-                      placeholder="Enter your ElevenLabs Agent ID"
-                      aria-label="ElevenLabs Agent ID"
-                    />
-                  )}
-                </div>
+            {/* Interviewer settings moved to Setup page */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
                   Recording Tips:

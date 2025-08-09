@@ -9,5 +9,5 @@ export type ElevenAgent = {
 // Example:
 // { id: "agnt_123", name: "Product Interviewer (Aria)", voiceId: "9BWtsMINqrJLrRacOk9x" }
 export const ELEVEN_AGENTS: ElevenAgent[] = [
-  // Populate with your own agents
+  { id: "agent_9801k286kms6e6f83fj5ex1ngmpc", name: "Default Interviewer Agent", voiceId: "9BWtsMINqrJLrRacOk9x" },
 ];

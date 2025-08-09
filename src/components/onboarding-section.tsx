@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 import { generateInterviewPlan, generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
 
 interface OnboardingSectionProps {
@@ -18,9 +19,17 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [count, setCount] = useState<number>(5);
   const [apiKey, setApiKey] = useState<string>(localStorage.getItem("PPLX_API_KEY") || "");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const startInterview = async () => {
     const topicValue = topic.trim() || "My Interview";
+    // Require agent selection before generating questions
+    const selectedAgent = localStorage.getItem('ELEVENLABS_AGENT_ID');
+    if (!selectedAgent) {
+      toast({ title: "Select an Interviewer Agent first", description: "Please complete setup before starting.", variant: "destructive" });
+      navigate('/setup');
+      return;
+    }
     try {
       setLoading(true);
       let questions: string[] = [];
