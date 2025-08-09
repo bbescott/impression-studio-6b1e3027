@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectLabel } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFollowUpQuestion, generateFollowUpQuestionWithGemini, generateVideoPreferencesWithGemini, type Persona } from "@/lib/ai";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,9 +46,31 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const [persona, setPersona] = useState<Persona>('professional');
-  const [guidance, setGuidance] = useState<string>("");
   const [isPlayingTTS, setIsPlayingTTS] = useState<boolean>(false);
-  const defaultVoiceId = "9BWtsMINqrJLrRacOk9x"; // Aria
+  const [voiceId, setVoiceId] = useState<string>("9BWtsMINqrJLrRacOk9x");
+  const [transcripts, setTranscripts] = useState<Record<number, string>>({});
+  const VOICES = [
+    { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
+    { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger" },
+    { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
+    { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura" },
+    { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie" },
+    { id: "JBFqnCBsd6RMkjVDRZzb", name: "George" },
+    { id: "N2lVS1w4EtoT3dr4eOWO", name: "Callum" },
+    { id: "SAz9YHcvj6GT2YYXdXww", name: "River" },
+    { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam" },
+    { id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte" },
+    { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice" },
+    { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda" },
+    { id: "bIHbv24MWmeRgasZH58o", name: "Will" },
+    { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica" },
+    { id: "cjVigY5qzO86Huf0OWal", name: "Eric" },
+    { id: "iP95p4xoKVk53GoZ742B", name: "Chris" },
+    { id: "nPczCjzI2devNBz1zQrb", name: "Brian" },
+    { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel" },
+    { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily" },
+    { id: "pqHfZKP75CvOlQylNhV4", name: "Bill" },
+  ];
 
   const getQuestionText = (idx: number) => questionOverrides[idx] || questions[idx];
 
@@ -79,6 +102,64 @@ const [hasPermissions, setHasPermissions] = useState(false);
     const k = localStorage.getItem('PPLX_API_KEY') || '';
     setApiKey(k);
   }, []);
+
+  // Helpers for transcription and follow-up
+  const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      reject(e);
+    }
+  });
+
+  const transcribeAndGenerateFollowUp = async (blob: Blob) => {
+    try {
+      toast({ title: "Analyzing answer…", description: "Transcribing and preparing the next question." });
+      const base64 = await blobToBase64(blob);
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { audio: base64 },
+      });
+      if (error) throw new Error(error.message);
+
+      const text = (data as any)?.text as string;
+      setTranscripts((prev) => ({ ...prev, [currentQuestion]: text || '' }));
+
+      const history = Array.from({ length: currentQuestion + 1 }, (_, i) => ({
+        question: getQuestionText(i),
+        summary: i === currentQuestion ? (text || '') : (prevTranscriptsRef.current[i] || ''),
+      }));
+
+      const nextQ = await generateFollowUpQuestionWithGemini({ persona, intent: 'Interview', history });
+      setQuestionOverrides((prev) => ({ ...prev, [currentQuestion + 1]: nextQ }));
+
+      // Play next question automatically with selected voice
+      const tts = await supabase.functions.invoke('elevenlabs-tts', {
+        body: { text: nextQ, voiceId },
+      });
+      const audioBase64 = (tts.data as any)?.audioContent as string;
+      if (audioBase64) {
+        const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+        await audio.play();
+      }
+      toast({ title: "Next question ready", description: "Tailored based on your last answer." });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Auto follow-up failed", description: e?.message || 'Try again later.', variant: 'destructive' });
+    }
+  };
+
+  // Keep a ref snapshot of transcripts to avoid stale closure inside async
+  const prevTranscriptsRef = useRef<Record<number, string>>({});
+  useEffect(() => {
+    prevTranscriptsRef.current = transcripts;
+  }, [transcripts]);
 
   const requestPermissions = async () => {
     try {
@@ -155,6 +236,8 @@ const startRecording = () => {
           ...prev.filter(r => r.questionIndex !== currentQuestion),
           newRecording
         ]);
+        // Auto-transcribe and generate next question
+        transcribeAndGenerateFollowUp(blob);
       };
 
       mediaRecorder.onerror = (event) => {
@@ -232,8 +315,8 @@ const startRecording = () => {
 const completeSession = async () => {
     console.log("Completing session with recordings:", recordings);
     try {
-      const history = questions.map((q, i) => ({ question: getQuestionText(i), summary: summaries[i] || '' }));
-      const { preferences, raw } = await generateVideoPreferencesWithGemini({ history, guidance });
+      const history = questions.map((q, i) => ({ question: getQuestionText(i), summary: transcripts[i] || summaries[i] || '' }));
+      const { preferences, raw } = await generateVideoPreferencesWithGemini({ history });
       if (preferences) {
         localStorage.setItem('VIDEO_PREFERENCES', JSON.stringify(preferences));
         console.log('Extracted video preferences:', preferences);
@@ -410,7 +493,7 @@ const handleGenerateFollowUp = async () => {
                 try {
                   setIsPlayingTTS(true);
                   const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-                    body: { text: getQuestionText(currentQuestion), voiceId: defaultVoiceId },
+                    body: { text: getQuestionText(currentQuestion), voiceId },
                   });
                   if (error) throw new Error(error.message);
                   const audioBase64 = (data as any)?.audioContent as string;
@@ -458,30 +541,45 @@ const handleGenerateFollowUp = async () => {
               </div>
             </div>
 
-            {/* Tips */}
+            {/* Interviewer Voice */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                  Your Answer Summary (optional, not shared)
+                  Interviewer Voice
                 </h4>
-                <Textarea
-                  placeholder="Jot a 1-2 sentence summary of your answer. Used only to guide the AI."
-                  value={summaries[currentQuestion] || ''}
-                  onChange={(e) => setSummaries((prev) => ({ ...prev, [currentQuestion]: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                  Interviewer Feedback (style/voice)
-                </h4>
-                <Textarea
-                  placeholder="e.g., Be more energetic and concise. Keep it casual."
-                  value={guidance}
-                  onChange={(e) => setGuidance(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleGenerateFollowUp} disabled={isGenerating} className="flex-1">
-                    Tailor Next Question
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Select value={voiceId} onValueChange={setVoiceId}>
+                      <SelectTrigger aria-label="Select interviewer voice">
+                        <SelectValue placeholder="Choose a voice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectLabel>ElevenLabs Voices</SelectLabel>
+                        {VOICES.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" onClick={async () => {
+                    try {
+                      setIsPlayingTTS(true);
+                      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+                        body: { text: "Hi, I’ll be your interviewer voice.", voiceId },
+                      });
+                      if (error) throw new Error(error.message);
+                      const audioBase64 = (data as any)?.audioContent as string;
+                      if (audioBase64) {
+                        const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+                        await audio.play();
+                      }
+                    } catch (e: any) {
+                      console.error(e);
+                      toast({ title: 'Could not preview voice', description: e?.message || 'Try again later', variant: 'destructive' });
+                    } finally {
+                      setIsPlayingTTS(false);
+                    }
+                  }}>
+                    <Volume2 className="w-4 h-4" /> Preview
                   </Button>
                 </div>
               </div>

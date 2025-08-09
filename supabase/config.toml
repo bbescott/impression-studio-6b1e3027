@@ -1,7 +1,10 @@
-project_id = "gdabsacoatuoalmeuozl"
+project_id = "pxohrtfhhltvkypyemit"
 
 [functions.generate-with-gemini]
 verify_jwt = false
 
 [functions.elevenlabs-tts]
+verify_jwt = false
+
+[functions.transcribe-audio]
 verify_jwt = false
