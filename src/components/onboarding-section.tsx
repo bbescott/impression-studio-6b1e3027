@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,10 +23,12 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [loading, setLoading] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [loadingVoices, setLoadingVoices] = useState(false);
-
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const [voicesPage, setVoicesPage] = useState<number>(1);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   // Inline setup states
   const [agents, setAgents] = useState<{ id: string; name: string; description?: string; voiceId?: string }[]>([]);
-  const [voices, setVoices] = useState<{ id: string; name: string }[]>([]);
+  const [voices, setVoices] = useState<{ id: string; name: string; previewUrl?: string }[]>([]);
   const [agentId, setAgentId] = useState<string>(localStorage.getItem("ELEVENLABS_AGENT_ID") || "agent_9801k286kms6e6f83fj5ex1ngmpc");
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
@@ -134,17 +136,54 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
     }
   };
 
+  const previewVoiceById = async (id: string) => {
+    try {
+      setPreviewingVoiceId(id);
+      // Stop previous
+      try { previewAudioRef.current?.pause(); } catch {}
+      const voice = voices.find((v) => v.id === id);
+      let audioSrc: string | undefined;
+      if (voice?.previewUrl) {
+        audioSrc = voice.previewUrl;
+      } else {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+          body: { text: 'This is a quick voice preview.', voiceId: id },
+        });
+        if (error) throw new Error(error.message);
+        const audioContent = (data as any)?.audioContent;
+        const mimeType = (data as any)?.mimeType || 'audio/mpeg';
+        if (!audioContent) throw new Error('No audio returned');
+        audioSrc = `data:${mimeType};base64,${audioContent}`;
+      }
+      if (!audioSrc) throw new Error('No preview available');
+      const audio = new Audio(audioSrc);
+      previewAudioRef.current = audio;
+      await audio.play();
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Preview failed', description: e?.message || 'Try again later', variant: 'destructive' });
+    } finally {
+      setPreviewingVoiceId(null);
+    }
+  };
+
   const loadMoreVoices = async () => {
     try {
       setLoadingVoices(true);
+      const nextPage = voicesPage + 1;
       const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices', {
-        body: { perPage: 200 },
+        body: { perPage: 50, page: nextPage },
       });
       if (error) throw new Error(error.message);
       const more = (data as any)?.voices || [];
       if (more.length) {
-        setVoices(more);
-        toast({ title: 'Loaded more voices', description: `Showing ${more.length} voices.` });
+        setVoices((prev) => {
+          const map = new Map<string, any>();
+          [...prev, ...more].forEach((v: any) => map.set(v.id, v));
+          return Array.from(map.values());
+        });
+        setVoicesPage(nextPage);
+        toast({ title: 'Loaded more voices', description: `Now showing ${voices.length + more.length} voices.` });
       } else {
         toast({ title: 'No more voices', description: 'Showing all available voices.' });
       }
@@ -295,14 +334,37 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
 
           <div className="space-y-2">
             <Label>Interviewer Voice</Label>
-            <Select value={voiceId} onValueChange={setVoiceId}>
+            <Select value={voiceId} onValueChange={(v) => {
+              if (v === "__load_more") { loadMoreVoices(); return; }
+              setVoiceId(v);
+            }}>
               <SelectTrigger aria-label="Select interviewer voice">
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
               <SelectContent>
                 {voices.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  <SelectItem key={v.id} value={v.id}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{v.name}</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); previewVoiceById(v.id); }}
+                        disabled={previewingVoiceId === v.id}
+                        aria-label={`Preview ${v.name}`}
+                      >
+                        {previewingVoiceId === v.id ? 'Playing…' : 'Preview'}
+                      </Button>
+                    </div>
+                  </SelectItem>
                 ))}
+                <SelectItem value="__load_more" disabled={loadingVoices}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Show more voices</span>
+                    <span className="text-muted-foreground text-xs">{loadingVoices ? 'Loading…' : ''}</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-3 pt-2">
