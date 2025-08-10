@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Link } from "react-router-dom";
-import { generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
+// removed unused Link import
+import { generateInterviewPlanWithGemini } from "@/lib/ai";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 
@@ -17,11 +17,12 @@ interface OnboardingSectionProps {
 export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const { toast } = useToast();
   const [topic, setTopic] = useState("");
-  const [persona, setPersona] = useState<Persona>("professional");
+  // persona removed - defaulting to professional behind the scenes
   const [count, setCount] = useState<number>(5);
   
   const [loading, setLoading] = useState(false);
-  
+  const [previewingVoice, setPreviewingVoice] = useState(false);
+  const [loadingVoices, setLoadingVoices] = useState(false);
 
   // Inline setup states
   const [agents, setAgents] = useState<{ id: string; name: string; description?: string; voiceId?: string }[]>([]);
@@ -106,7 +107,48 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
     })();
     return () => { mounted = false };
   }, []);
+  // Voice preview and load-more handlers
+  const handleVoicePreview = async () => {
+    try {
+      setPreviewingVoice(true);
+      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+        body: { text: 'This is a quick voice preview.', voiceId },
+      });
+      if (error) throw new Error(error.message);
+      const audioContent = (data as any)?.audioContent;
+      const mimeType = (data as any)?.mimeType || 'audio/mpeg';
+      if (!audioContent) throw new Error('No audio returned');
+      const audio = new Audio(`data:${mimeType};base64,${audioContent}`);
+      await audio.play();
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Preview failed', description: e?.message || 'Try again later', variant: 'destructive' });
+    } finally {
+      setPreviewingVoice(false);
+    }
+  };
 
+  const loadMoreVoices = async () => {
+    try {
+      setLoadingVoices(true);
+      const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices', {
+        body: { perPage: 200 },
+      });
+      if (error) throw new Error(error.message);
+      const more = (data as any)?.voices || [];
+      if (more.length) {
+        setVoices(more);
+        toast({ title: 'Loaded more voices', description: `Showing ${more.length} voices.` });
+      } else {
+        toast({ title: 'No more voices', description: 'Showing all available voices.' });
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Failed to load voices', description: e?.message || 'Try again later', variant: 'destructive' });
+    } finally {
+      setLoadingVoices(false);
+    }
+  };
   const startInterview = async () => {
     const topicValue = topic.trim() || "My Interview";
 
@@ -139,7 +181,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
       setLoading(true);
       let questions: string[] = [];
 
-      localStorage.setItem("INTERVIEW_PERSONA", persona);
+      // persona removed from storage
       localStorage.setItem("INTERVIEW_TOPIC", topicValue);
       localStorage.setItem("INTERVIEW_INTENT", "Custom");
       localStorage.setItem("INTERVIEW_COUNT", String(count));
@@ -147,7 +189,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
         const aiQuestions = await generateInterviewPlanWithGemini({
           topic: topicValue,
           intent: "Custom",
-          persona,
+          persona: "professional",
           questionsCount: count,
         });
         questions = aiQuestions?.length ? aiQuestions : [];
@@ -197,36 +239,20 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Persona</Label>
-              <Select value={persona} onValueChange={(v) => setPersona(v as Persona)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose persona" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="flirty">Flirty</SelectItem>
-                  <SelectItem value="empathetic">Empathetic</SelectItem>
-                  <SelectItem value="philosophical">Philosophical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Questions</Label>
-              <Select value={String(count)} onValueChange={(v) => setCount(parseInt(v, 10))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="5" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[3, 4, 5, 6, 7].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Questions</Label>
+            <Select value={String(count)} onValueChange={(v) => setCount(parseInt(v, 10))}>
+              <SelectTrigger>
+                <SelectValue placeholder="5" />
+              </SelectTrigger>
+              <SelectContent>
+                {[3, 4, 5, 6, 7].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -273,6 +299,14 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-3 pt-2">
+              <Button type="button" size="sm" variant="secondary" onClick={handleVoicePreview} disabled={!voiceId || previewingVoice}>
+                {previewingVoice ? 'Previewing…' : 'Preview voice'}
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={loadMoreVoices} disabled={loadingVoices}>
+                {loadingVoices ? 'Loading voices…' : 'Show more voices'}
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -297,12 +331,6 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
             <Button onClick={startInterview} variant="hero" disabled={loading} className="group">
               {loading ? "Generating…" : "Start Interview"}
             </Button>
-            <div className="text-sm text-muted-foreground">
-              Or{' '}
-              <Button asChild variant="link" size="sm">
-                <Link to="/setup">set up interviewer, voice & studio</Link>
-              </Button>
-            </div>
           </div>
         </Card>
       </div>

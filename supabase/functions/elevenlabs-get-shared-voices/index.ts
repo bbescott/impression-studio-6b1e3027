@@ -15,7 +15,22 @@ serve(async (req) => {
   try {
     if (!ELEVENLABS_API_KEY) throw new Error("Missing ELEVENLABS_API_KEY secret");
 
-    const res = await fetch("https://api.elevenlabs.io/v1/shared-voices", {
+    // Support optional pagination via POST body
+    let perPage: number | undefined;
+    let page: number | undefined;
+    try {
+      const body = await req.json();
+      perPage = body?.perPage ?? body?.limit;
+      page = body?.page;
+    } catch {}
+
+    const params = new URLSearchParams();
+    if (perPage) params.set("per_page", String(perPage));
+    if (page) params.set("page", String(page));
+
+    const url = `https://api.elevenlabs.io/v1/shared-voices${params.size ? `?${params.toString()}` : ''}`;
+
+    const res = await fetch(url, {
       method: "GET",
       headers: {
         "xi-api-key": ELEVENLABS_API_KEY,
