@@ -84,14 +84,12 @@ export default function Setup() {
       try {
         const eligible = (list: any[]) => list.filter((v: any) => {
           const labels = v.labels as string[] | undefined;
-          const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
           const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || v.highQuality === true || !!v.previewUrl);
           const lang = (v.language ?? '').toString().toLowerCase();
           const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
           const isEnglishCode = /^en[-_\s](us|gb|uk|au|nz|za|ca)$/.test(lang);
-          const allowedPhrase = /(american|united states|british|united kingdom|great britain|australian|canadian|south african|new zealand|kiwi)\b/.test(haystack);
-          const inAllowedAccent = isEnglishCode || allowedPhrase;
-          return isConversational && isHighQuality && inAllowedAccent;
+          const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+          return isHighQuality && inAllowedAccent;
         });
         let page = 1;
         let combined: any[] = [];
@@ -253,7 +251,7 @@ export default function Setup() {
               <SelectTrigger aria-label="Select ElevenLabs Agent">
                 <SelectValue placeholder={agents.length ? "Choose an agent" : "No agents available"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent onCloseAutoFocus={(e) => { if (previewingVoiceId) { e.preventDefault(); setVoiceOpen(true); } }}>
                 <SelectGroup>
                   {agents.map((a) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
@@ -280,18 +278,16 @@ export default function Setup() {
               <SelectTrigger aria-label="Select interviewer voice">
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent onCloseAutoFocus={(e) => { if (previewingVoiceId) { e.preventDefault(); setVoiceOpen(true); } }}>
                 <SelectGroup>
                   {voices.filter((v: any) => {
                     const labels = (v as any).labels as string[] | undefined;
-                    const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
                     const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || (v as any).highQuality === true || !!v.previewUrl);
                     const lang = ((v as any).language ?? '').toString().toLowerCase();
                     const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
                     const isEnglishCode = /^en[-_\s](us|gb|uk|au|nz|za|ca)$/.test(lang);
-                    const allowedPhrase = /(american|united states|british|united kingdom|great britain|australian|canadian|south african|new zealand|kiwi)\b/.test(haystack);
-                    const inAllowedAccent = isEnglishCode || allowedPhrase;
-                    return isConversational && isHighQuality && inAllowedAccent;
+                    const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+                    return isHighQuality && inAllowedAccent;
                   }).map((v) => (
                     <SelectItem key={v.id} value={v.id}>
                       <div className="flex items-center justify-between gap-2">
@@ -300,7 +296,7 @@ export default function Setup() {
                           type="button"
                           variant="link"
                           size="sm"
-                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); }}
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); }} onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }} onMouseUp={(e) => { e.preventDefault(); e.stopPropagation(); }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); } }}
                           disabled={previewingVoiceId === v.id}
                           aria-label={`Preview ${v.name}`}
                         >
