@@ -33,6 +33,7 @@ export default function Setup() {
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
   const [interviewTitle, setInterviewTitle] = useState<string>(localStorage.getItem("INTERVIEW_TITLE") || "");
+  const [profileUrl, setProfileUrl] = useState<string>(localStorage.getItem("PROFILE_URL") || "");
 
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [loadingVoices, setLoadingVoices] = useState(false);
@@ -52,7 +53,7 @@ export default function Setup() {
     document.title = "Setup Interview – Select Agent, Voice, Studio";
     const metaDesc = document.querySelector('meta[name="description"]') || document.createElement('meta');
     metaDesc.setAttribute('name', 'description');
-    metaDesc.setAttribute('content', 'Interview setup: choose ElevenLabs agent, voice, and studio background.');
+    metaDesc.setAttribute('content', 'Interview setup: choose agent, voice, studio, and optionally add a profile URL for tailored questions.');
     document.head.appendChild(metaDesc);
 
     const link = document.querySelector('link[rel="canonical"]') || document.createElement('link');
@@ -242,6 +243,7 @@ export default function Setup() {
     localStorage.setItem('TTS_VOICE_ID', voiceId);
     localStorage.setItem('SELECTED_STUDIO', studio);
     localStorage.setItem('INTERVIEW_TITLE', interviewTitle);
+    localStorage.setItem('PROFILE_URL', profileUrl);
     toast({ title: 'Setup saved', description: 'You can now start your interview.' });
     navigate('/');
   };
@@ -263,6 +265,19 @@ export default function Setup() {
               placeholder="e.g., Senior Backend Engineer Interview"
               aria-label="Title of the interview"
             />
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Profile URL (optional)</h4>
+            <Input
+              type="url"
+              value={profileUrl}
+              onChange={(e) => setProfileUrl(e.target.value)}
+              placeholder="e.g., https://www.linkedin.com/in/yourname or https://hinge.co/..."
+              aria-label="Profile URL"
+            />
+            <p className="text-xs text-muted-foreground">
+              Add a relevant link to help tailor questions. Examples: LinkedIn, personal website, resume link, or a dating profile (Hinge/Tinder/Bumble).
+            </p>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
