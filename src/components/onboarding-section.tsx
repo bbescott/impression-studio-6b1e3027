@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate, Link } from "react-router-dom";
-import { generateInterviewPlan, generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
+import { Link } from "react-router-dom";
+import { generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 
@@ -19,9 +19,9 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [topic, setTopic] = useState("");
   const [persona, setPersona] = useState<Persona>("professional");
   const [count, setCount] = useState<number>(5);
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem("PPLX_API_KEY") || "");
+  
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  
 
   // Inline setup states
   const [agents, setAgents] = useState<{ id: string; name: string; description?: string; voiceId?: string }[]>([]);
@@ -139,36 +139,20 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
       setLoading(true);
       let questions: string[] = [];
 
-      if (apiKey) {
-        localStorage.setItem("PPLX_API_KEY", apiKey);
-        localStorage.setItem("INTERVIEW_PERSONA", persona);
-        localStorage.setItem("INTERVIEW_TOPIC", topicValue);
-        localStorage.setItem("INTERVIEW_INTENT", "Custom");
-        localStorage.setItem("INTERVIEW_COUNT", String(count));
-        const aiQuestions = await generateInterviewPlan({
+      localStorage.setItem("INTERVIEW_PERSONA", persona);
+      localStorage.setItem("INTERVIEW_TOPIC", topicValue);
+      localStorage.setItem("INTERVIEW_INTENT", "Custom");
+      localStorage.setItem("INTERVIEW_COUNT", String(count));
+      try {
+        const aiQuestions = await generateInterviewPlanWithGemini({
           topic: topicValue,
           intent: "Custom",
           persona,
           questionsCount: count,
-          apiKey,
         });
         questions = aiQuestions?.length ? aiQuestions : [];
-      } else {
-        localStorage.setItem("INTERVIEW_PERSONA", persona);
-        localStorage.setItem("INTERVIEW_TOPIC", topicValue);
-        localStorage.setItem("INTERVIEW_INTENT", "Custom");
-        localStorage.setItem("INTERVIEW_COUNT", String(count));
-        try {
-          const aiQuestions = await generateInterviewPlanWithGemini({
-            topic: topicValue,
-            intent: "Custom",
-            persona,
-            questionsCount: count,
-          });
-          questions = aiQuestions?.length ? aiQuestions : [];
-        } catch (err) {
-          console.error(err);
-        }
+      } catch (err) {
+        console.error(err);
       }
 
       if (!questions.length) {
@@ -308,19 +292,6 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">Perplexity API Key (optional)</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="pplx_..."
-            />
-            {!apiKey && (
-              <p className="text-xs text-muted-foreground">No key? We'll use server AI or a basic set.</p>
-            )}
-          </div>
 
           <div className="flex flex-col gap-2">
             <Button onClick={startInterview} variant="hero" disabled={loading} className="group">
