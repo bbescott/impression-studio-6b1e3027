@@ -157,9 +157,8 @@ export default function Setup() {
           return Array.from(map.values());
         });
         setVoicesPage(nextPage);
-        toast({ title: 'Loaded more voices', description: `Now showing ${voices.length + more.length} voices.` });
       } else {
-        toast({ title: 'No more voices', description: 'Showing all available voices.' });
+        // no more voices
       }
     } catch (e: any) {
       console.error(e);

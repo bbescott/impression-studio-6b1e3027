@@ -184,9 +184,8 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
           return Array.from(map.values());
         });
         setVoicesPage(nextPage);
-        toast({ title: 'Loaded more voices', description: `Now showing ${voices.length + more.length} voices.` });
       } else {
-        toast({ title: 'No more voices', description: 'Showing all available voices.' });
+        // no more voices
       }
     } catch (e: any) {
       console.error(e);
@@ -373,14 +372,6 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                 </div>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-3 pt-2">
-              <Button type="button" size="sm" variant="secondary" onClick={handleVoicePreview} disabled={!voiceId || previewingVoice}>
-                {previewingVoice ? 'Previewing…' : 'Preview voice'}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={loadMoreVoices} disabled={loadingVoices}>
-                {loadingVoices ? 'Loading voices…' : 'Show more voices'}
-              </Button>
-            </div>
           </div>
 
           <div className="space-y-2">
