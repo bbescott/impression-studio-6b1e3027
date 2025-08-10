@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.elevenlabs-get-shared-voices]
 verify_jwt = false
+
+[functions.fetch-profile-context]
+verify_jwt = false

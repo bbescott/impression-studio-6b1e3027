@@ -244,9 +244,8 @@ export default function Setup() {
     localStorage.setItem('SELECTED_STUDIO', studio);
     localStorage.setItem('INTERVIEW_TITLE', interviewTitle);
     localStorage.setItem('PROFILE_URL', profileUrl);
-    toast({ title: 'Setup saved', description: 'You can now start your interview.' });
-    localStorage.setItem('JUST_FINISHED_SETUP', '1');
-    navigate('/');
+    toast({ title: 'Setup saved', description: 'Starting your live interview…' });
+    navigate('/call');
   };
 
   return (
@@ -388,7 +387,7 @@ export default function Setup() {
           </div>
 
           <div className="pt-2">
-            <Button variant="hero" onClick={handleContinue} className="w-full">Save & Continue</Button>
+            <Button variant="hero" onClick={handleContinue} className="w-full">Start Interview</Button>
           </div>
         </Card>
       </div>
