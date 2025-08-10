@@ -88,8 +88,9 @@ export default function Setup() {
           const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || v.highQuality === true || !!v.previewUrl);
           const lang = (v.language ?? '').toString().toLowerCase();
           const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
-          const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
-          const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+          const isEnglishCode = /^en[-_\s](us|gb|uk|au|nz|za|ca)$/.test(lang);
+          const allowedPhrase = /(american|united states|british|united kingdom|great britain|australian|canadian|south african|new zealand|kiwi)\b/.test(haystack);
+          const inAllowedAccent = isEnglishCode || allowedPhrase;
           return isConversational && isHighQuality && inAllowedAccent;
         });
         let page = 1;
@@ -147,7 +148,14 @@ export default function Setup() {
   const previewVoiceById = async (id: string) => {
     try {
       setPreviewingVoiceId(id);
-      try { previewAudioRef.current?.pause(); } catch {}
+      setVoiceOpen(true);
+      try {
+        if (previewAudioRef.current) {
+          previewAudioRef.current.pause();
+          previewAudioRef.current.src = '';
+        }
+      } catch {}
+
       const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
         body: { text: PREVIEW_TEXT, voiceId: id },
       });
@@ -157,13 +165,18 @@ export default function Setup() {
       if (!audioContent) throw new Error('No audio returned');
       const audioSrc = `data:${mimeType};base64,${audioContent}`;
       const audio = new Audio(audioSrc);
+      audio.onended = () => {
+        setPreviewingVoiceId(null);
+      };
+      audio.onerror = () => {
+        setPreviewingVoiceId(null);
+      };
       previewAudioRef.current = audio;
       await audio.play();
     } catch (e: any) {
       console.error(e);
-      toast({ title: 'Preview failed', description: e?.message || 'Try again later', variant: 'destructive' });
-    } finally {
       setPreviewingVoiceId(null);
+      toast({ title: 'Preview failed', description: e?.message || 'Try again later', variant: 'destructive' });
     }
   };
 
@@ -275,8 +288,9 @@ export default function Setup() {
                     const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || (v as any).highQuality === true || !!v.previewUrl);
                     const lang = ((v as any).language ?? '').toString().toLowerCase();
                     const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
-                    const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
-                    const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+                    const isEnglishCode = /^en[-_\s](us|gb|uk|au|nz|za|ca)$/.test(lang);
+                    const allowedPhrase = /(american|united states|british|united kingdom|great britain|australian|canadian|south african|new zealand|kiwi)\b/.test(haystack);
+                    const inAllowedAccent = isEnglishCode || allowedPhrase;
                     return isConversational && isHighQuality && inAllowedAccent;
                   }).map((v) => (
                     <SelectItem key={v.id} value={v.id}>
@@ -286,10 +300,7 @@ export default function Setup() {
                           type="button"
                           variant="link"
                           size="sm"
-                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
-                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
-                          onMouseUp={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); }}
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); }}
                           disabled={previewingVoiceId === v.id}
                           aria-label={`Preview ${v.name}`}
                         >
