@@ -1,6 +1,7 @@
 // Simple AI helper using Perplexity Chat Completions API
 // Stores no secrets; expects a user-provided API key (temporary) saved in localStorage under 'PPLX_API_KEY'
 import { supabase } from "@/integrations/supabase/client";
+import { getAgentTags } from "@/config/elevenlabs";
 
 export type Persona = 'professional' | 'flirty' | 'empathetic' | 'philosophical';
 
@@ -153,10 +154,10 @@ export async function generateFollowUpQuestionWithGemini(params: {
   return ((data as any)?.question as string) || '';
 }
 
-// Lightweight agent selector with rule-based scoring and Gemini fallback
+// Lightweight agent selector with rule-based scoring, tags, and Gemini fallback
 export async function selectAgentForTopic(params: {
   title: string;
-  agents: { id: string; name: string; description?: string }[];
+  agents: { id: string; name: string; description?: string; tags?: string[] }[];
   strategy?: 'rule' | 'gemini' | 'hybrid';
 }): Promise<{ agentId: string; reason: string; source: 'rule' | 'gemini' }>{
   const { title, agents, strategy = 'hybrid' } = params;
@@ -164,6 +165,7 @@ export async function selectAgentForTopic(params: {
 
   const kwCareer = ['career','job','jobs','resume','cv','interview','hiring','recruiter','technical','coding','software','engineer','role','position','salary','offer','portfolio','linkedin'];
   const kwDating = ['date','dating','relationship','relationships','match','matches','hinge','tinder','bumble','profile','love','romance','first date','compatibility'];
+  const kwDatingApps = ['hinge','tinder','bumble'];
 
   const containsAny = (s: string, kws: string[]) => kws.some(k => s.includes(k));
 
@@ -174,16 +176,32 @@ export async function selectAgentForTopic(params: {
       ? 'dating'
       : 'unknown';
 
-  // Score agents by their names/descriptions
+  // Score agents using tags (explicit or heuristic) and names/descriptions
   const scored = agents.map(a => {
     const hay = `${a.name || ''} ${a.description || ''}`.toLowerCase();
+    const tags = (a as any).tags && Array.isArray((a as any).tags) ? (a as any).tags as string[] : getAgentTags({ id: a.id, name: a.name, description: a.description });
     let score = 0;
+
+    // Strong boost based on tags against detected target
+    if (target === 'career' && tags.includes('career')) score += 6;
+    if (target === 'dating' && tags.includes('dating')) score += 6;
+
+    // Dating app boosts when present in title and in agent tags
+    if (target === 'dating') {
+      kwDatingApps.forEach(app => {
+        if (text.includes(app) && tags.includes(app)) score += 4;
+      });
+    }
+
+    // Name/description keyword overlap (lighter weight)
     if (target === 'career') score += kwCareer.reduce((acc,k)=> acc + (hay.includes(k)?1:0), 0);
     if (target === 'dating') score += kwDating.reduce((acc,k)=> acc + (hay.includes(k)?1:0), 0);
+
     // Generic boosts if names contain clear category words
-    if (/career|job|interview/.test(hay)) score += 3;
-    if (/dating|date|relationship/.test(hay)) score += 3;
-    return { id: a.id, score };
+    if (/career|job|interview/.test(hay)) score += 2;
+    if (/dating|date|relationship/.test(hay)) score += 2;
+
+    return { id: a.id, score, tags };
   }).sort((a,b) => b.score - a.score);
 
   if (strategy !== 'gemini') {
@@ -191,8 +209,8 @@ export async function selectAgentForTopic(params: {
     if (top && (top.score > 0 || agents.length === 1)) {
       const chosen = agents.find(a => a.id === top.id)!;
       const why = target === 'unknown'
-        ? 'Selected highest scoring agent by name/description.'
-        : `Matched “${title}” to ${target} keywords.`;
+        ? `Selected highest scoring agent by tags/name. Tags: ${(top.tags || []).slice(0,3).join(', ')}`
+        : `Matched “${title}” to ${target} intent. Tags: ${(top.tags || []).slice(0,3).join(', ')}`;
       return { agentId: chosen.id, reason: why, source: 'rule' };
     }
     // if rule-based is requested explicitly and no match, fallback to first
