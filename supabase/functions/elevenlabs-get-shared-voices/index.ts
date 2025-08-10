@@ -52,12 +52,31 @@ serve(async (req) => {
       : [];
 
     const voices = rawVoices
-      .map((v: any) => ({
-        id: v?.voice_id ?? v?.id ?? v?.uuid ?? null,
-        name: v?.name ?? "Unnamed Voice",
-        previewUrl: v?.preview_url ?? v?.preview ?? v?.samples?.[0]?.sample_url ?? undefined,
-        language: v?.labels?.language ?? v?.language ?? undefined,
-      }))
+      .map((v: any) => {
+        const labelsFromObject = v?.labels && typeof v.labels === 'object'
+          ? Object.values(v.labels).flat().filter((x: any) => typeof x === 'string')
+          : [];
+        const extraTags = (Array.isArray(v?.categories) ? v.categories : [])
+          .concat(Array.isArray(v?.styles) ? v.styles : [])
+          .concat(Array.isArray(v?.tags) ? v.tags : []);
+        const labels = Array.from(new Set([...labelsFromObject, ...extraTags].map((s: any) => String(s))));
+        const language = (v?.labels?.language ?? v?.language ?? undefined);
+        const previewUrl = v?.preview_url ?? v?.preview ?? v?.samples?.[0]?.sample_url ?? undefined;
+        const highQuality = Boolean(
+          v?.high_quality === true ||
+          v?.quality === 'high' ||
+          (v?.labels && (v.labels.quality === 'high' || v.labels.tier === 'pro')) ||
+          previewUrl
+        );
+        return {
+          id: v?.voice_id ?? v?.id ?? v?.uuid ?? null,
+          name: v?.name ?? "Unnamed Voice",
+          previewUrl,
+          language,
+          labels,
+          highQuality,
+        };
+      })
       .filter((v: any) => v.id && v.name);
 
     return new Response(

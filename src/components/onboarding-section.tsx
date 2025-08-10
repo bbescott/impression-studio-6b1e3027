@@ -4,11 +4,14 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 // removed unused Link import
 import { generateInterviewPlanWithGemini } from "@/lib/ai";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
+import { Switch } from "@/components/ui/switch";
+
+const PREVIEW_TEXT = "Hello there, I am your interviewer.";
 
 interface OnboardingSectionProps {
   onGoalSelect: (goal: string, questions: string[]) => void;
@@ -33,6 +36,8 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [filterConversational, setFilterConversational] = useState(true);
+  const [filterHighQuality, setFilterHighQuality] = useState(true);
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
   const [studios, setStudios] = useState<string[]>([
     "/studios/podcast-1.jpg",
@@ -121,7 +126,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
     try {
       setPreviewingVoice(true);
       const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-        body: { text: 'This is a quick voice preview.', voiceId },
+        body: { text: PREVIEW_TEXT, voiceId },
       });
       if (error) throw new Error(error.message);
       const audioContent = (data as any)?.audioContent;
@@ -148,7 +153,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
         audioSrc = voice.previewUrl;
       } else {
         const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-          body: { text: 'This is a quick voice preview.', voiceId: id },
+          body: { text: PREVIEW_TEXT, voiceId: id },
         });
         if (error) throw new Error(error.message);
         const audioContent = (data as any)?.audioContent;
@@ -334,6 +339,16 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
 
           <div className="space-y-2">
             <Label>Interviewer Voice</Label>
+            <div className="flex flex-wrap items-center gap-4 pb-1">
+              <div className="flex items-center gap-2">
+                <Switch id="onb-filter-conversational" checked={filterConversational} onCheckedChange={setFilterConversational} />
+                <Label htmlFor="onb-filter-conversational">Conversational</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="onb-filter-high-quality" checked={filterHighQuality} onCheckedChange={setFilterHighQuality} />
+                <Label htmlFor="onb-filter-high-quality">High quality</Label>
+              </div>
+            </div>
             <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => {
               setVoiceId(v);
             }}>
@@ -341,7 +356,17 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
               <SelectContent>
-                {voices.map((v) => (
+                {voices.filter((v: any) => {
+                  let ok = true;
+                  if (filterConversational) {
+                    const labels = (v as any).labels as string[] | undefined;
+                    ok = ok && (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
+                  }
+                  if (filterHighQuality) {
+                    ok = ok && (((v as any).highQuality === true) || !!v.previewUrl);
+                  }
+                  return ok;
+                }).map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     <div className="flex items-center justify-between gap-2">
                       <span>{v.name}</span>
