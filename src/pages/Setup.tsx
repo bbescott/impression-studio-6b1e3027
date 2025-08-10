@@ -17,8 +17,7 @@ const ALLOWED_ACCENTS = [
   'australia', 'australian', 'aussie', 'en-au', 'en au', 'en_au',
   'canada', 'canadian', 'canadian english', 'en-ca', 'en ca', 'en_ca',
   'south africa', 'south african', 'south african english', 'en-za', 'en za', 'en_za',
-  'new zealand', 'nz', 'kiwi', 'new zealand english', 'en-nz', 'en nz', 'en_nz',
-  'english', 'en'
+  'new zealand', 'nz', 'kiwi', 'new zealand english', 'en-nz', 'en nz', 'en_nz'
 ].map(s => s.toLowerCase());
 
 export default function Setup() {
@@ -32,12 +31,14 @@ export default function Setup() {
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
+  const [interviewTitle, setInterviewTitle] = useState<string>(localStorage.getItem("INTERVIEW_TITLE") || "");
 
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesPage, setVoicesPage] = useState<number>(1);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => { if (previewingVoiceId) setVoiceOpen(true); }, [previewingVoiceId]);
   const [studios, setStudios] = useState<string[]>([
     "/studios/studio-1.jpg",
     "/studios/studio-2.jpg",
@@ -84,7 +85,7 @@ export default function Setup() {
         const eligible = (list: any[]) => list.filter((v: any) => {
           const labels = v.labels as string[] | undefined;
           const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
-          const isHighQuality = (v.highQuality === true) || !!v.previewUrl;
+          const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || v.highQuality === true || !!v.previewUrl);
           const lang = (v.language ?? '').toString().toLowerCase();
           const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
           const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
@@ -201,6 +202,7 @@ export default function Setup() {
     localStorage.setItem('ELEVENLABS_AGENT_ID', agentId);
     localStorage.setItem('TTS_VOICE_ID', voiceId);
     localStorage.setItem('SELECTED_STUDIO', studio);
+    localStorage.setItem('INTERVIEW_TITLE', interviewTitle);
     toast({ title: 'Setup saved', description: 'You can now start your interview.' });
     navigate('/');
   };
@@ -214,6 +216,15 @@ export default function Setup() {
         </div>
 
         <Card className="p-6 space-y-6">
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interview Title</h4>
+            <Input
+              value={interviewTitle}
+              onChange={(e) => setInterviewTitle(e.target.value)}
+              placeholder="e.g., Senior Backend Engineer Interview"
+              aria-label="Title of the interview"
+            />
+          </div>
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Agent</h4>
             <Select
@@ -252,7 +263,7 @@ export default function Setup() {
 
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Voice</h4>
-            <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => { setVoiceId(v); }}>
+            <Select value={voiceId} open={voiceOpen} onOpenChange={(open) => { if (previewingVoiceId) { setVoiceOpen(true); return; } setVoiceOpen(open); }} onValueChange={(v) => { setVoiceId(v); }}>
               <SelectTrigger aria-label="Select interviewer voice">
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
@@ -261,7 +272,7 @@ export default function Setup() {
                   {voices.filter((v: any) => {
                     const labels = (v as any).labels as string[] | undefined;
                     const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
-                    const isHighQuality = ((v as any).highQuality === true) || !!v.previewUrl;
+                    const isHighQuality = (labels?.some(l => /high[\s-]?quality/i.test(l)) || (v as any).highQuality === true || !!v.previewUrl);
                     const lang = ((v as any).language ?? '').toString().toLowerCase();
                     const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
                     const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
