@@ -167,14 +167,17 @@ export async function selectAgentForTopic(params: {
   const kwDating = ['date','dating','relationship','relationships','match','matches','hinge','tinder','bumble','profile','love','romance','first date','compatibility'];
   const kwDatingApps = ['hinge','tinder','bumble'];
 
-  const containsAny = (s: string, kws: string[]) => kws.some(k => s.includes(k));
+  // Identify intent from title using weighted keyword counts (dating apps get higher weight)
+  const countHits = (s: string, kws: string[]) => kws.reduce((acc, k) => acc + (s.includes(k) ? 1 : 0), 0);
+  const careerHits = countHits(text, kwCareer);
+  const datingHits = countHits(text, kwDating) + countHits(text, kwDatingApps) * 2;
 
-  // Identify intent from title
-  const target: 'career' | 'dating' | 'unknown' = containsAny(text, kwCareer)
-    ? 'career'
-    : containsAny(text, kwDating)
-      ? 'dating'
-      : 'unknown';
+  let target: 'career' | 'dating' | 'unknown' = 'unknown';
+  if (careerHits > datingHits && careerHits > 0) target = 'career';
+  else if (datingHits > careerHits && datingHits > 0) target = 'dating';
+  else if (careerHits === datingHits && datingHits > 0) {
+    target = kwDatingApps.some(app => text.includes(app)) ? 'dating' : 'career';
+  }
 
   // Score agents using tags (explicit or heuristic) and names/descriptions
   const scored = agents.map(a => {
