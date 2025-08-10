@@ -349,6 +349,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                         type="button"
                         variant="link"
                         size="sm"
+                        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); previewVoiceById(v.id); }}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); previewVoiceById(v.id); }}
                         disabled={previewingVoiceId === v.id}
                         aria-label={`Preview ${v.name}`}
