@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeroSection } from "@/components/hero-section";
-import { OnboardingSection } from "@/components/onboarding-section";
 import { RecordingStudio } from "@/components/recording-studio";
 import { ProcessingSection } from "@/components/processing-section";
+import { generateInterviewPlanWithGemini } from "@/lib/ai";
 
-type AppState = 'hero' | 'onboarding' | 'recording' | 'processing';
+type AppState = 'hero' | 'recording' | 'processing';
 
 interface Recording {
   questionIndex: number;
@@ -37,31 +37,37 @@ const Index = () => {
   };
 
   const handleStartOver = () => {
-    setCurrentState('onboarding');
     setSelectedGoal('');
     setQuestions([]);
     setRecordings([]);
+    navigate('/setup');
   };
 
   const handleBackToOnboarding = () => {
-    setCurrentState('onboarding');
+    navigate('/setup');
   };
 
   useEffect(() => {
-    if (localStorage.getItem('JUST_FINISHED_SETUP') === '1') {
-      localStorage.removeItem('JUST_FINISHED_SETUP');
-      setCurrentState('onboarding');
-    }
+    (async () => {
+      if (localStorage.getItem('JUST_FINISHED_SETUP') === '1') {
+        localStorage.removeItem('JUST_FINISHED_SETUP');
+        const title = localStorage.getItem('INTERVIEW_TITLE') || 'Interview';
+        setSelectedGoal(title);
+        try {
+          const plan = await generateInterviewPlanWithGemini({ topic: title, intent: 'Interview', persona: 'professional', questionsCount: 6 });
+          setQuestions(Array.isArray(plan) && plan.length ? plan : [`Tell me about yourself in relation to "${title}".`]);
+        } catch {
+          setQuestions([`Tell me about yourself in relation to "${title}".`]);
+        }
+        setCurrentState('recording');
+      }
+    })();
   }, []);
 
   return (
     <div className="min-h-screen bg-background">
       {currentState === 'hero' && (
         <HeroSection onGetStarted={handleGetStarted} />
-      )}
-      
-      {currentState === 'onboarding' && (
-        <OnboardingSection onGoalSelect={handleGoalSelect} />
       )}
       
       {currentState === 'recording' && (
