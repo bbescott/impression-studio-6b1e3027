@@ -12,18 +12,13 @@ const DEFAULT_AGENT_ID = "agent_9801k286kms6e6f83fj5ex1ngmpc";
 const PREVIEW_TEXT = "Hello there, I am your interviewer.";
 
 const ALLOWED_ACCENTS = [
-  'us',
-  'united states',
-  'american',
-  'australian',
-  'canadian',
-  'south african',
-  'new zealand',
-  'nz',
-  'british',
-  'uk',
-  'english (uk)',
-  'england'
+  'us', 'usa', 'u.s.', 'united states', 'american', 'american english', 'en-us', 'en us', 'en_us',
+  'uk', 'u.k.', 'united kingdom', 'great britain', 'british', 'british english', 'en-gb', 'en gb', 'en_gb',
+  'australia', 'australian', 'aussie', 'en-au', 'en au', 'en_au',
+  'canada', 'canadian', 'canadian english', 'en-ca', 'en ca', 'en_ca',
+  'south africa', 'south african', 'south african english', 'en-za', 'en za', 'en_za',
+  'new zealand', 'nz', 'kiwi', 'new zealand english', 'en-nz', 'en nz', 'en_nz',
+  'english', 'en'
 ].map(s => s.toLowerCase());
 
 export default function Setup() {
@@ -90,8 +85,10 @@ export default function Setup() {
           const labels = v.labels as string[] | undefined;
           const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
           const isHighQuality = (v.highQuality === true) || !!v.previewUrl;
-          const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${v.language ?? ''}`.toLowerCase();
-          const inAllowedAccent = ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+          const lang = (v.language ?? '').toString().toLowerCase();
+          const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
+          const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
+          const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
           return isConversational && isHighQuality && inAllowedAccent;
         });
         let page = 1;
@@ -265,8 +262,10 @@ export default function Setup() {
                     const labels = (v as any).labels as string[] | undefined;
                     const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
                     const isHighQuality = ((v as any).highQuality === true) || !!v.previewUrl;
-                    const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${(v as any).language ?? ''}`.toLowerCase();
-                    const inAllowedAccent = ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+                    const lang = ((v as any).language ?? '').toString().toLowerCase();
+                    const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${lang}`.toLowerCase();
+                    const isEnglishCode = /^en($|[-_\s](us|gb|uk|au|nz|za|ca)$)/.test(lang);
+                    const inAllowedAccent = isEnglishCode || ALLOWED_ACCENTS.some((k) => haystack.includes(k));
                     return isConversational && isHighQuality && inAllowedAccent;
                   }).map((v) => (
                     <SelectItem key={v.id} value={v.id}>
