@@ -25,6 +25,7 @@ export default function Setup() {
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesPage, setVoicesPage] = useState<number>(1);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [studios, setStudios] = useState<string[]>([
     "/studios/studio-1.jpg",
@@ -229,7 +230,7 @@ export default function Setup() {
 
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Voice</h4>
-            <Select value={voiceId} onValueChange={(v) => { if (v === "__load_more") { loadMoreVoices(); return; } setVoiceId(v); }}>
+            <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => { setVoiceId(v); }}>
               <SelectTrigger aria-label="Select interviewer voice">
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
@@ -253,12 +254,18 @@ export default function Setup() {
                       </div>
                     </SelectItem>
                   ))}
-                  <SelectItem value="__load_more" disabled={loadingVoices}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground outline-none"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); loadMoreVoices(); }}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <span>Show more voices</span>
                       <span className="text-muted-foreground text-xs">{loadingVoices ? 'Loading…' : ''}</span>
                     </div>
-                  </SelectItem>
+                  </div>
                 </SelectGroup>
               </SelectContent>
             </Select>

@@ -32,6 +32,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [agentId, setAgentId] = useState<string>(localStorage.getItem("ELEVENLABS_AGENT_ID") || "agent_9801k286kms6e6f83fj5ex1ngmpc");
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
   const [studios, setStudios] = useState<string[]>([
     "/studios/podcast-1.jpg",
@@ -334,8 +335,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
 
           <div className="space-y-2">
             <Label>Interviewer Voice</Label>
-            <Select value={voiceId} onValueChange={(v) => {
-              if (v === "__load_more") { loadMoreVoices(); return; }
+            <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => {
               setVoiceId(v);
             }}>
               <SelectTrigger aria-label="Select interviewer voice">
@@ -359,12 +359,18 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                     </div>
                   </SelectItem>
                 ))}
-                <SelectItem value="__load_more" disabled={loadingVoices}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground outline-none"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); loadMoreVoices(); }}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span>Show more voices</span>
                     <span className="text-muted-foreground text-xs">{loadingVoices ? 'Loading…' : ''}</span>
                   </div>
-                </SelectItem>
+                </div>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-3 pt-2">
