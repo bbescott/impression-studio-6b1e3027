@@ -53,9 +53,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing url' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+
     let html = '';
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Lovable/AI)' } });
+      const res = await fetch(normalizedUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Lovable/AI)' } });
       html = await res.text();
     } catch (e) {
       console.warn('Fetch failed', e);

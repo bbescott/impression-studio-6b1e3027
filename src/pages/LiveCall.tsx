@@ -19,6 +19,7 @@ export default function LiveCall() {
   const [connecting, setConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [transcript, setTranscript] = useState<string>("");
+  const startedRef = useRef(false);
 
   // Prepare overrides after we have all setup info
   const overrides = useMemo(() => {
@@ -81,14 +82,15 @@ export default function LiveCall() {
     })();
   }, []);
 
-  // Auto-start call when overrides ready and not connected
+  // Auto-start call when setup is loaded; run only once
   useEffect(() => {
     (async () => {
-      if (loading) return;
+      if (loading || startedRef.current) return;
       if (!agentId) {
         toast({ title: 'Agent missing', description: 'Select an ElevenLabs agent in Setup.', variant: 'destructive' });
         return;
       }
+      startedRef.current = true; // prevent multiple attempts
       try {
         setConnecting(true);
         await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -107,11 +109,12 @@ export default function LiveCall() {
       } catch (e: any) {
         console.error('Failed to start call', e);
         toast({ title: 'Failed to start', description: e?.message || 'Microphone permission or Agent issue.', variant: 'destructive' });
+        startedRef.current = false; // allow retry on manual navigation
       } finally {
         setConnecting(false);
       }
     })();
-  }, [loading, agentId, conversation, overrides, toast]);
+  }, [loading, agentId]);
 
   const endCall = async () => {
     try { await conversation.endSession(); } catch {}
