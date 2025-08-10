@@ -85,6 +85,7 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionIdRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
     requestPermissions();
@@ -199,6 +200,52 @@ const [hasPermissions, setHasPermissions] = useState(false);
       reject(e);
     }
   });
+
+  // Save the current question's recording and transcript to Supabase
+  const saveRecordingToSupabase = async (opts: {
+    blob: Blob;
+    duration: number;
+    questionIndex: number;
+    question: string;
+    transcript?: string;
+  }) => {
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) console.warn('auth.getUser error', userErr);
+      const userId = userData?.user?.id;
+      if (!userId) {
+        toast({
+          title: 'Sign in to save',
+          description: 'Recordings are saved to your private cloud when signed in.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const path = `${userId}/${sessionIdRef.current}/q-${opts.questionIndex}.webm`;
+      const { error: uploadError } = await supabase.storage
+        .from('recordings')
+        .upload(path, opts.blob, { upsert: true, contentType: 'video/webm' });
+      if (uploadError) throw uploadError;
+
+      const { error: insertError } = await supabase.from('transcripts').insert({
+        user_id: userId,
+        session_id: sessionIdRef.current,
+        question_index: opts.questionIndex,
+        question: opts.question,
+        transcript: opts.transcript || null,
+        audio_path: null,
+        video_path: path,
+        duration_seconds: Math.round(opts.duration || 0),
+      });
+      if (insertError) throw insertError;
+
+      toast({ title: 'Saved', description: `Response Q${opts.questionIndex + 1} saved to cloud.` });
+    } catch (e: any) {
+      console.error('Save failed', e);
+      toast({ title: 'Cloud save failed', description: e?.message || 'Try again later.', variant: 'destructive' });
+    }
+  };
 
   const transcribeAndGenerateFollowUp = async (blob: Blob) => {
     try {
@@ -371,6 +418,14 @@ const startRecording = async () => {
           ...prev.filter(r => r.questionIndex !== currentQuestion),
           newRecording
         ]);
+        // Save to Supabase (if signed in)
+        saveRecordingToSupabase({
+          blob,
+          duration: finalDuration,
+          questionIndex: currentQuestion,
+          question: questions[currentQuestion],
+          transcript: currentTranscript.trim() || undefined,
+        });
         // Auto-transcribe and generate next question
         processFollowUpFromTranscript();
       };
