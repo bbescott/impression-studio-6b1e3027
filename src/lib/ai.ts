@@ -167,27 +167,36 @@ export async function selectAgentForTopic(params: {
   const kwDating = ['date','dating','relationship','relationships','match','matches','hinge','tinder','bumble','profile','love','romance','first date','compatibility'];
   const kwDatingApps = ['hinge','tinder','bumble'];
 
-  // Disambiguate intent with weighted counts + company brand context
-  const kwCareerStrong = ['internship','intern','job','jobs','hiring','application','apply','role','position','offer','salary','recruiter','cv','resume','cover letter','portfolio','linkedin','technical interview','coding interview','system design','onsite','phone screen','take home','whiteboard'];
+  // Disambiguate intent with rules prioritizing context
+  const kwCareerStrong = ['internship','intern','job','jobs','hiring','application','apply','role','position','offer','salary','recruiter','cv','resume','cover letter','portfolio','linkedin','technical interview','coding interview','system design','onsite','phone screen','take home','whiteboard','career','careers'];
   const countHits = (s: string, kws: string[]) => kws.reduce((acc, k) => acc + (s.includes(k) ? 1 : 0), 0);
-  const careerHitsBase = countHits(text, kwCareer);
-  const datingHitsBase = countHits(text, kwDating) + countHits(text, kwDatingApps) * 2;
-  const hasAppBrand = kwDatingApps.some(app => text.includes(app));
-  const hasCareerStrong = kwCareerStrong.some(k => text.includes(k)) || /\b(interview|internship|job|role|position)\b/.test(text);
-  const brandAsCompany = /(at|for)\s+(tinder|bumble|hinge)\b/.test(text);
+  const hasInterview = /\binterviews?\b/.test(text);
+  const hasProfile = /\bprofiles?\b/.test(text);
+  const hasInternOrJobTerms = kwCareerStrong.some(k => text.includes(k));
+  const brandMention = kwDatingApps.some(app => text.includes(app));
+  const brandAsCompany = /\b(at|for|with|join)\s+(tinder|bumble|hinge)\b/.test(text) || /\b(tinder|bumble|hinge)\s+careers?\b/.test(text);
 
-  let careerHits = careerHitsBase;
-  let datingHits = datingHitsBase;
-
-  // If an app brand appears in a clear career context, tilt towards career
-  if (hasAppBrand && hasCareerStrong) careerHits += 3;
-  if (brandAsCompany) careerHits += 2;
-
+  // Shortcut rules
   let target: 'career' | 'dating' | 'unknown' = 'unknown';
-  if (careerHits > datingHits && careerHits > 0) target = 'career';
-  else if (datingHits > careerHits && datingHits > 0) target = 'dating';
-  else if (careerHits === datingHits && (careerHits > 0 || datingHits > 0)) {
-    target = (hasCareerStrong || brandAsCompany) ? 'career' : (hasAppBrand ? 'dating' : 'unknown');
+  if (brandMention && hasProfile) {
+    target = 'dating';
+  } else if (brandMention && hasInterview && !hasInternOrJobTerms && !brandAsCompany) {
+    // “bumble interview” with no career qualifiers -> dating by default
+    target = 'dating';
+  } else {
+    // Weighted counts fallback
+    let careerHits = countHits(text, kwCareer);
+    let datingHits = countHits(text, kwDating) + countHits(text, kwDatingApps) * 2;
+
+    if (hasInternOrJobTerms) careerHits += 3;
+    if (brandAsCompany) careerHits += 2;
+    if (brandMention && !hasInternOrJobTerms && !brandAsCompany) datingHits += 1;
+
+    if (careerHits > datingHits && careerHits > 0) target = 'career';
+    else if (datingHits > careerHits && datingHits > 0) target = 'dating';
+    else if (careerHits === datingHits && (careerHits > 0 || datingHits > 0)) {
+      target = (hasInternOrJobTerms || brandAsCompany) ? 'career' : (brandMention ? 'dating' : 'unknown');
+    }
   }
 
   // Score agents using tags (explicit or heuristic) and names/descriptions
