@@ -167,16 +167,27 @@ export async function selectAgentForTopic(params: {
   const kwDating = ['date','dating','relationship','relationships','match','matches','hinge','tinder','bumble','profile','love','romance','first date','compatibility'];
   const kwDatingApps = ['hinge','tinder','bumble'];
 
-  // Identify intent from title using weighted keyword counts (dating apps get higher weight)
+  // Disambiguate intent with weighted counts + company brand context
+  const kwCareerStrong = ['internship','intern','job','jobs','hiring','application','apply','role','position','offer','salary','recruiter','cv','resume','cover letter','portfolio','linkedin','technical interview','coding interview','system design','onsite','phone screen','take home','whiteboard'];
   const countHits = (s: string, kws: string[]) => kws.reduce((acc, k) => acc + (s.includes(k) ? 1 : 0), 0);
-  const careerHits = countHits(text, kwCareer);
-  const datingHits = countHits(text, kwDating) + countHits(text, kwDatingApps) * 2;
+  const careerHitsBase = countHits(text, kwCareer);
+  const datingHitsBase = countHits(text, kwDating) + countHits(text, kwDatingApps) * 2;
+  const hasAppBrand = kwDatingApps.some(app => text.includes(app));
+  const hasCareerStrong = kwCareerStrong.some(k => text.includes(k)) || /\b(interview|internship|job|role|position)\b/.test(text);
+  const brandAsCompany = /(at|for)\s+(tinder|bumble|hinge)\b/.test(text);
+
+  let careerHits = careerHitsBase;
+  let datingHits = datingHitsBase;
+
+  // If an app brand appears in a clear career context, tilt towards career
+  if (hasAppBrand && hasCareerStrong) careerHits += 3;
+  if (brandAsCompany) careerHits += 2;
 
   let target: 'career' | 'dating' | 'unknown' = 'unknown';
   if (careerHits > datingHits && careerHits > 0) target = 'career';
   else if (datingHits > careerHits && datingHits > 0) target = 'dating';
-  else if (careerHits === datingHits && datingHits > 0) {
-    target = kwDatingApps.some(app => text.includes(app)) ? 'dating' : 'career';
+  else if (careerHits === datingHits && (careerHits > 0 || datingHits > 0)) {
+    target = (hasCareerStrong || brandAsCompany) ? 'career' : (hasAppBrand ? 'dating' : 'unknown');
   }
 
   // Score agents using tags (explicit or heuristic) and names/descriptions
