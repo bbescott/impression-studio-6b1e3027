@@ -11,6 +11,21 @@ import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 const DEFAULT_AGENT_ID = "agent_9801k286kms6e6f83fj5ex1ngmpc";
 const PREVIEW_TEXT = "Hello there, I am your interviewer.";
 
+const ALLOWED_ACCENTS = [
+  'us',
+  'united states',
+  'american',
+  'australian',
+  'canadian',
+  'south african',
+  'new zealand',
+  'nz',
+  'british',
+  'uk',
+  'english (uk)',
+  'england'
+].map(s => s.toLowerCase());
+
 export default function Setup() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -75,7 +90,9 @@ export default function Setup() {
           const labels = v.labels as string[] | undefined;
           const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
           const isHighQuality = (v.highQuality === true) || !!v.previewUrl;
-          return isConversational && isHighQuality;
+          const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${v.language ?? ''}`.toLowerCase();
+          const inAllowedAccent = ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+          return isConversational && isHighQuality && inAllowedAccent;
         });
         let page = 1;
         let combined: any[] = [];
@@ -89,7 +106,7 @@ export default function Setup() {
           if (eligible(combined).length >= 30) break;
           if (!apiVoices.length) break;
           page += 1;
-          if (page > 5) break; // safety cap
+          if (page > 20) break; // safety cap
         }
         if (!mounted) return;
         setVoices(combined);
@@ -248,7 +265,9 @@ export default function Setup() {
                     const labels = (v as any).labels as string[] | undefined;
                     const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
                     const isHighQuality = ((v as any).highQuality === true) || !!v.previewUrl;
-                    return isConversational && isHighQuality;
+                    const haystack = `${(labels || []).join(' ')} ${v.name ?? ''} ${(v as any).language ?? ''}`.toLowerCase();
+                    const inAllowedAccent = ALLOWED_ACCENTS.some((k) => haystack.includes(k));
+                    return isConversational && isHighQuality && inAllowedAccent;
                   }).map((v) => (
                     <SelectItem key={v.id} value={v.id}>
                       <div className="flex items-center justify-between gap-2">
@@ -257,8 +276,10 @@ export default function Setup() {
                           type="button"
                           variant="link"
                           size="sm"
-                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); previewVoiceById(v.id); }}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); previewVoiceById(v.id); }}
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
+                          onMouseUp={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVoiceOpen(true); previewVoiceById(v.id); }}
                           disabled={previewingVoiceId === v.id}
                           aria-label={`Preview ${v.name}`}
                         >
