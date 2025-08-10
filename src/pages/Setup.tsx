@@ -4,8 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
@@ -29,8 +27,6 @@ export default function Setup() {
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesPage, setVoicesPage] = useState<number>(1);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [filterConversational, setFilterConversational] = useState(true);
-  const [filterHighQuality, setFilterHighQuality] = useState(true);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [studios, setStudios] = useState<string[]>([
     "/studios/studio-1.jpg",
@@ -75,13 +71,30 @@ export default function Setup() {
 
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices');
-        if (error) throw new Error(error.message);
-        const apiVoices = (data as any)?.voices || [];
+        const eligible = (list: any[]) => list.filter((v: any) => {
+          const labels = v.labels as string[] | undefined;
+          const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
+          const isHighQuality = (v.highQuality === true) || !!v.previewUrl;
+          return isConversational && isHighQuality;
+        });
+        let page = 1;
+        let combined: any[] = [];
+        while (true) {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices', {
+            body: { perPage: 50, page },
+          });
+          if (error) throw new Error(error.message);
+          const apiVoices = (data as any)?.voices || [];
+          combined = Array.from(new Map([...combined, ...apiVoices].map((v: any) => [v.id, v])).values());
+          if (eligible(combined).length >= 30) break;
+          if (!apiVoices.length) break;
+          page += 1;
+          if (page > 5) break; // safety cap
+        }
         if (!mounted) return;
-        if (apiVoices.length) setVoices(apiVoices);
+        setVoices(combined);
+        setVoicesPage(page);
       } catch (e) {
-        // fallback minimal set
         setVoices([
           { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
           { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
@@ -120,21 +133,14 @@ export default function Setup() {
     try {
       setPreviewingVoiceId(id);
       try { previewAudioRef.current?.pause(); } catch {}
-      const voice = voices.find((v) => v.id === id);
-      let audioSrc: string | undefined;
-      if (voice?.previewUrl) {
-        audioSrc = voice.previewUrl;
-      } else {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-          body: { text: PREVIEW_TEXT, voiceId: id },
-        });
-        if (error) throw new Error(error.message);
-        const audioContent = (data as any)?.audioContent;
-        const mimeType = (data as any)?.mimeType || 'audio/mpeg';
-        if (!audioContent) throw new Error('No audio returned');
-        audioSrc = `data:${mimeType};base64,${audioContent}`;
-      }
-      if (!audioSrc) throw new Error('No preview available');
+      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+        body: { text: PREVIEW_TEXT, voiceId: id },
+      });
+      if (error) throw new Error(error.message);
+      const audioContent = (data as any)?.audioContent;
+      const mimeType = (data as any)?.mimeType || 'audio/mpeg';
+      if (!audioContent) throw new Error('No audio returned');
+      const audioSrc = `data:${mimeType};base64,${audioContent}`;
       const audio = new Audio(audioSrc);
       previewAudioRef.current = audio;
       await audio.play();
@@ -211,13 +217,11 @@ export default function Setup() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel>Your Agents</SelectLabel>
                   {agents.map((a) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
                 </SelectGroup>
                 <SelectGroup>
-                  <SelectLabel>Other</SelectLabel>
                   <SelectItem value="_custom">Custom Agent ID…</SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -234,33 +238,17 @@ export default function Setup() {
 
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Voice</h4>
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Switch id="filter-conversational" checked={filterConversational} onCheckedChange={setFilterConversational} />
-                <Label htmlFor="filter-conversational">Conversational</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch id="filter-high-quality" checked={filterHighQuality} onCheckedChange={setFilterHighQuality} />
-                <Label htmlFor="filter-high-quality">High quality</Label>
-              </div>
-            </div>
             <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => { setVoiceId(v); }}>
               <SelectTrigger aria-label="Select interviewer voice">
                 <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel>ElevenLabs Voices</SelectLabel>
                   {voices.filter((v: any) => {
-                    let ok = true;
-                    if (filterConversational) {
-                      const labels = (v as any).labels as string[] | undefined;
-                      ok = ok && (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
-                    }
-                    if (filterHighQuality) {
-                      ok = ok && (((v as any).highQuality === true) || !!v.previewUrl);
-                    }
-                    return ok;
+                    const labels = (v as any).labels as string[] | undefined;
+                    const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
+                    const isHighQuality = ((v as any).highQuality === true) || !!v.previewUrl;
+                    return isConversational && isHighQuality;
                   }).map((v) => (
                     <SelectItem key={v.id} value={v.id}>
                       <div className="flex items-center justify-between gap-2">

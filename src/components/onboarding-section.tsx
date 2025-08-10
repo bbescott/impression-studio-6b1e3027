@@ -36,8 +36,6 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [filterConversational, setFilterConversational] = useState(true);
-  const [filterHighQuality, setFilterHighQuality] = useState(true);
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
   const [studios, setStudios] = useState<string[]>([
     "/studios/podcast-1.jpg",
@@ -77,14 +75,30 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
     let mounted = true;
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices');
-        if (error) throw new Error(error.message);
-        const apiVoices = (data as any)?.voices || [];
-        if (!mounted) return;
-        if (apiVoices.length) {
-          setVoices(apiVoices);
-          if (!voiceId && apiVoices[0]?.id) setVoiceId(apiVoices[0].id);
+        const eligible = (list: any[]) => list.filter((v: any) => {
+          const labels = v.labels as string[] | undefined;
+          const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
+          const isHighQuality = (v.highQuality === true) || !!v.previewUrl;
+          return isConversational && isHighQuality;
+        });
+        let page = 1;
+        let combined: any[] = [];
+        while (true) {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-get-shared-voices', {
+            body: { perPage: 50, page },
+          });
+          if (error) throw new Error(error.message);
+          const apiVoices = (data as any)?.voices || [];
+          combined = Array.from(new Map([...combined, ...apiVoices].map((v: any) => [v.id, v])).values());
+          if (eligible(combined).length >= 30) break;
+          if (!apiVoices.length) break;
+          page += 1;
+          if (page > 5) break;
         }
+        if (!mounted) return;
+        setVoices(combined);
+        if (!voiceId && combined[0]?.id) setVoiceId(combined[0].id);
+        setVoicesPage(page);
       } catch (_) {
         setVoices([
           { id: "9BWtsMINqrJLrRacOk9x", name: "Aria" },
@@ -147,23 +161,14 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
       setPreviewingVoiceId(id);
       // Stop previous
       try { previewAudioRef.current?.pause(); } catch {}
-      const voice = voices.find((v) => v.id === id);
-      let audioSrc: string | undefined;
-      if (voice?.previewUrl) {
-        audioSrc = voice.previewUrl;
-      } else {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-          body: { text: PREVIEW_TEXT, voiceId: id },
-        });
-        if (error) throw new Error(error.message);
-        const audioContent = (data as any)?.audioContent;
-        const mimeType = (data as any)?.mimeType || 'audio/mpeg';
-        if (!audioContent) throw new Error('No audio returned');
-        audioSrc = `data:${mimeType};base64,${audioContent}`;
-      }
-      if (!audioSrc) throw new Error('No preview available');
-      const audio = new Audio(audioSrc);
-      previewAudioRef.current = audio;
+      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+        body: { text: PREVIEW_TEXT, voiceId: id },
+      });
+      if (error) throw new Error(error.message);
+      const audioContent = (data as any)?.audioContent;
+      const mimeType = (data as any)?.mimeType || 'audio/mpeg';
+      if (!audioContent) throw new Error('No audio returned');
+      const audio = new Audio(`data:${mimeType};base64,${audioContent}`);
       await audio.play();
     } catch (e: any) {
       console.error(e);
@@ -317,7 +322,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                 if (a?.voiceId) setVoiceId(a.voiceId);
               }}
             >
-              <SelectTrigger aria-label="Select ElevenLabs Agent">
+              <SelectTrigger aria-label="Select Agent">
                 <SelectValue placeholder={agents.length ? "Choose an agent" : "No agents available"} />
               </SelectTrigger>
               <SelectContent>
@@ -339,16 +344,6 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
 
           <div className="space-y-2">
             <Label>Interviewer Voice</Label>
-            <div className="flex flex-wrap items-center gap-4 pb-1">
-              <div className="flex items-center gap-2">
-                <Switch id="onb-filter-conversational" checked={filterConversational} onCheckedChange={setFilterConversational} />
-                <Label htmlFor="onb-filter-conversational">Conversational</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch id="onb-filter-high-quality" checked={filterHighQuality} onCheckedChange={setFilterHighQuality} />
-                <Label htmlFor="onb-filter-high-quality">High quality</Label>
-              </div>
-            </div>
             <Select value={voiceId} open={voiceOpen} onOpenChange={setVoiceOpen} onValueChange={(v) => {
               setVoiceId(v);
             }}>
@@ -357,15 +352,10 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
               </SelectTrigger>
               <SelectContent>
                 {voices.filter((v: any) => {
-                  let ok = true;
-                  if (filterConversational) {
-                    const labels = (v as any).labels as string[] | undefined;
-                    ok = ok && (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
-                  }
-                  if (filterHighQuality) {
-                    ok = ok && (((v as any).highQuality === true) || !!v.previewUrl);
-                  }
-                  return ok;
+                  const labels = (v as any).labels as string[] | undefined;
+                  const isConversational = (labels?.some(l => /conversational/i.test(l)) || /conversational/i.test(v.name));
+                  const isHighQuality = ((v as any).highQuality === true) || !!v.previewUrl;
+                  return isConversational && isHighQuality;
                 }).map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     <div className="flex items-center justify-between gap-2">
