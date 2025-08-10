@@ -272,7 +272,7 @@ export default function Setup() {
               type="url"
               value={profileUrl}
               onChange={(e) => setProfileUrl(e.target.value)}
-              placeholder="e.g., https://www.linkedin.com/in/yourname or https://hinge.co/..."
+              placeholder="e.g., LinkedIn, personal site, resume, Hinge/Tinder/Bumble"
               aria-label="Profile URL"
             />
             <p className="text-xs text-muted-foreground">
