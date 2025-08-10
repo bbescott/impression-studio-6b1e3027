@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Mic, Video, Sparkles, Play } from "lucide-react";
 import studioHero from "@/assets/studio-hero.jpg";
+import { Link } from "react-router-dom";
 
 interface HeroSectionProps {
   onGetStarted: () => void;
@@ -49,6 +50,9 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
             <Button variant="hero" size="xl" className="group" onClick={onGetStarted}>
               <Play className="w-5 h-5 transition-transform group-hover:scale-110" />
               Start Recording
+            </Button>
+            <Button asChild variant="secondary" size="xl">
+              <Link to="/setup">Setup Studio</Link>
             </Button>
             <Button variant="outline" size="xl" onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')}>
               <Video className="w-5 h-5" />

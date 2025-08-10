@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { generateInterviewPlan, generateInterviewPlanWithGemini, type Persona } from "@/lib/ai";
 
 interface OnboardingSectionProps {
@@ -165,9 +165,17 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
             )}
           </div>
 
-          <Button onClick={startInterview} variant="hero" disabled={loading} className="group">
-            {loading ? "Generating…" : "Start Interview"}
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button onClick={startInterview} variant="hero" disabled={loading} className="group">
+              {loading ? "Generating…" : "Start Interview"}
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              Or{' '}
+              <Button asChild variant="link" size="sm">
+                <Link to="/setup">set up interviewer, voice & studio</Link>
+              </Button>
+            </div>
+          </div>
         </Card>
       </div>
     </div>
