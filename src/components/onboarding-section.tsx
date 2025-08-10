@@ -32,6 +32,12 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
   const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
   const [studios, setStudios] = useState<string[]>([
+    "/studios/podcast-1.jpg",
+    "/studios/podcast-2.jpg",
+    "/studios/podcast-3.jpg",
+    "/studios/podcast-4.jpg",
+    "/studios/podcast-5.jpg",
+    "/studios/podcast-6.jpg",
     "/studios/studio-1.jpg",
     "/studios/studio-2.jpg",
     "/studios/studio-3.jpg",
