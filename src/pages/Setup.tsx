@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
+import { selectAgentForTopic } from "@/lib/ai";
 
 const DEFAULT_AGENT_ID = "agent_9801k286kms6e6f83fj5ex1ngmpc";
 const PREVIEW_TEXT = "Hello there, I am your interviewer.";
@@ -39,6 +40,8 @@ export default function Setup() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { if (previewingVoiceId) setVoiceOpen(true); }, [previewingVoiceId]);
+  const [agentHint, setAgentHint] = useState<string | null>(null);
+
   const [studios, setStudios] = useState<string[]>([
     "/studios/studio-1.jpg",
     "/studios/studio-2.jpg",
@@ -205,6 +208,31 @@ export default function Setup() {
     }
   };
 
+  const onAutoSelectAgent = async () => {
+    try {
+      if (!interviewTitle.trim()) {
+        toast({ title: 'Add a title', description: 'Enter the interview title/topic first.' });
+        return;
+      }
+      const { agentId: bestId, reason, source } = await selectAgentForTopic({
+        title: interviewTitle,
+        agents,
+      });
+      const chosen = agents.find(a => a.id === bestId);
+      if (chosen) {
+        setAgentId(chosen.id);
+        setAgentHint(`Recommended (${source}): ${chosen.name}${reason ? ` — ${reason}` : ''}`);
+        if (chosen.voiceId) setVoiceId(chosen.voiceId);
+        toast({ title: 'Agent selected', description: chosen.name });
+      } else {
+        toast({ title: 'Could not auto-select', description: 'No matching agent found', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Auto-select failed', description: e?.message || 'Try again later', variant: 'destructive' });
+    }
+  };
+
   const handleContinue = () => {
     if (!agentId || (isCustomAgent && agentId.trim().length < 5)) {
       toast({ title: 'Select a valid agent', description: 'Choose from the list or paste a valid Agent ID.', variant: 'destructive' });
@@ -237,7 +265,10 @@ export default function Setup() {
             />
           </div>
           <div className="space-y-3">
-            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Agent</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Interviewer Agent</h4>
+              <Button variant="secondary" size="sm" onClick={onAutoSelectAgent}>Auto-select agent</Button>
+            </div>
             <Select
               value={isCustomAgent ? "_custom" : (agentId || "")}
               onValueChange={(v) => {
@@ -262,6 +293,9 @@ export default function Setup() {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {agentHint && (
+              <p className="text-xs text-muted-foreground">{agentHint}</p>
+            )}
             {isCustomAgent && (
               <Input
                 value={agentId}

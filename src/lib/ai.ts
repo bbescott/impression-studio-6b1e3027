@@ -152,3 +152,65 @@ export async function generateFollowUpQuestionWithGemini(params: {
   if (error) throw new Error(error.message || 'Gemini function error');
   return ((data as any)?.question as string) || '';
 }
+
+// Lightweight agent selector with rule-based scoring and Gemini fallback
+export async function selectAgentForTopic(params: {
+  title: string;
+  agents: { id: string; name: string; description?: string }[];
+  strategy?: 'rule' | 'gemini' | 'hybrid';
+}): Promise<{ agentId: string; reason: string; source: 'rule' | 'gemini' }>{
+  const { title, agents, strategy = 'hybrid' } = params;
+  const text = (title || '').toLowerCase();
+
+  const kwCareer = ['career','job','jobs','resume','cv','interview','hiring','recruiter','technical','coding','software','engineer','role','position','salary','offer','portfolio','linkedin'];
+  const kwDating = ['date','dating','relationship','relationships','match','matches','hinge','tinder','bumble','profile','love','romance','first date','compatibility'];
+
+  const containsAny = (s: string, kws: string[]) => kws.some(k => s.includes(k));
+
+  // Identify intent from title
+  const target: 'career' | 'dating' | 'unknown' = containsAny(text, kwCareer)
+    ? 'career'
+    : containsAny(text, kwDating)
+      ? 'dating'
+      : 'unknown';
+
+  // Score agents by their names/descriptions
+  const scored = agents.map(a => {
+    const hay = `${a.name || ''} ${a.description || ''}`.toLowerCase();
+    let score = 0;
+    if (target === 'career') score += kwCareer.reduce((acc,k)=> acc + (hay.includes(k)?1:0), 0);
+    if (target === 'dating') score += kwDating.reduce((acc,k)=> acc + (hay.includes(k)?1:0), 0);
+    // Generic boosts if names contain clear category words
+    if (/career|job|interview/.test(hay)) score += 3;
+    if (/dating|date|relationship/.test(hay)) score += 3;
+    return { id: a.id, score };
+  }).sort((a,b) => b.score - a.score);
+
+  if (strategy !== 'gemini') {
+    const top = scored[0];
+    if (top && (top.score > 0 || agents.length === 1)) {
+      const chosen = agents.find(a => a.id === top.id)!;
+      const why = target === 'unknown'
+        ? 'Selected highest scoring agent by name/description.'
+        : `Matched “${title}” to ${target} keywords.`;
+      return { agentId: chosen.id, reason: why, source: 'rule' };
+    }
+    // if rule-based is requested explicitly and no match, fallback to first
+    if (strategy === 'rule') {
+      return { agentId: agents[0].id, reason: 'Fallback to first agent (no clear match)', source: 'rule' };
+    }
+  }
+
+  // Gemini fallback
+  const payloadAgents = agents.map(a => ({ id: a.id, name: a.name, description: a.description || '' }));
+  const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
+    body: { mode: 'select-agent', title, agents: payloadAgents },
+  });
+  if (error) throw new Error(error.message || 'Gemini function error');
+  const agentId = (data as any)?.agentId as string | undefined;
+  const reason = ((data as any)?.reason as string | undefined) || 'Selected by Gemini';
+  if (agentId) return { agentId, reason, source: 'gemini' };
+  // last resort
+  return { agentId: agents[0].id, reason: 'Fallback to first agent', source: 'rule' };
+}
+

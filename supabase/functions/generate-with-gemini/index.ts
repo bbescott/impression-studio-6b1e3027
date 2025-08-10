@@ -137,6 +137,55 @@ serve(async (req) => {
       });
     }
 
+    if (mode === "select-agent") {
+      const title = (body?.title as string) || (body?.topic as string) || "";
+      const agents = (body?.agents as { id: string; name: string; description?: string }[]) || [];
+
+      if (!Array.isArray(agents) || agents.length === 0) {
+        return new Response(JSON.stringify({ agentId: null, reason: "No agents provided" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const list = agents
+        .map((a) => `- id: ${a.id}\n  name: ${a.name}\n  description: ${a.description || ''}`)
+        .join("\n");
+
+      const prompt = `You are selecting the best interview agent for a user's session based on the session title/topic.\n` +
+`Title: "${title}"\n\n` +
+`Agents:\n${list}\n\n` +
+`Return ONLY valid minified JSON like {"agentId":"...","reason":"..."}. Choose exactly one agentId from the list.`;
+
+      const out = await callGemini(prompt);
+
+      let agentId = agents[0].id;
+      let reason = "Defaulted to first agent";
+      try {
+        const parsed = JSON.parse(out);
+        if (parsed?.agentId && typeof parsed.agentId === 'string') {
+          agentId = parsed.agentId;
+          if (typeof parsed?.reason === 'string' && parsed.reason) reason = parsed.reason;
+        }
+      } catch (_) {
+        try {
+          const start = out.indexOf('{');
+          const end = out.lastIndexOf('}');
+          if (start !== -1 && end !== -1 && end > start) {
+            const snippet = out.slice(start, end + 1);
+            const parsed = JSON.parse(snippet);
+            if (parsed?.agentId && typeof parsed.agentId === 'string') {
+              agentId = parsed.agentId;
+              if (typeof parsed?.reason === 'string' && parsed.reason) reason = parsed.reason;
+            }
+          }
+        } catch {}
+      }
+
+      return new Response(JSON.stringify({ agentId, reason }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Invalid mode" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
