@@ -45,18 +45,11 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
             perfect for job applications, dating profiles, and personal branding.
           </p>
           
-          {/* CTA Buttons */}
+          {/* CTA Button */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button variant="hero" size="xl" className="group" onClick={onGetStarted}>
               <Play className="w-5 h-5 transition-transform group-hover:scale-110" />
               Start Recording
-            </Button>
-            <Button asChild variant="secondary" size="xl">
-              <Link to="/setup">Setup Studio</Link>
-            </Button>
-            <Button variant="outline" size="xl" onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')}>
-              <Video className="w-5 h-5" />
-              Watch Demo
             </Button>
           </div>
           

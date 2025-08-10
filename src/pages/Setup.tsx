@@ -245,6 +245,7 @@ export default function Setup() {
     localStorage.setItem('INTERVIEW_TITLE', interviewTitle);
     localStorage.setItem('PROFILE_URL', profileUrl);
     toast({ title: 'Setup saved', description: 'You can now start your interview.' });
+    localStorage.setItem('JUST_FINISHED_SETUP', '1');
     navigate('/');
   };
 

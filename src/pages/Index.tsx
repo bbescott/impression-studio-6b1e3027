@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { HeroSection } from "@/components/hero-section";
 import { OnboardingSection } from "@/components/onboarding-section";
 import { RecordingStudio } from "@/components/recording-studio";
@@ -18,9 +19,10 @@ const Index = () => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const [questions, setQuestions] = useState<string[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
+  const navigate = useNavigate();
 
   const handleGetStarted = () => {
-    setCurrentState('onboarding');
+    navigate('/setup');
   };
 
   const handleGoalSelect = (goal: string, goalQuestions: string[]) => {
@@ -44,6 +46,13 @@ const Index = () => {
   const handleBackToOnboarding = () => {
     setCurrentState('onboarding');
   };
+
+  useEffect(() => {
+    if (localStorage.getItem('JUST_FINISHED_SETUP') === '1') {
+      localStorage.removeItem('JUST_FINISHED_SETUP');
+      setCurrentState('onboarding');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
