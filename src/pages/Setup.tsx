@@ -4,12 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 import { selectAgentForTopic } from "@/lib/ai";
 
-const DEFAULT_AGENT_ID = "agent_9801k286kms6e6f83fj5ex1ngmpc";
+
 const PREVIEW_TEXT = "Hello there, I am your interviewer.";
 
 const ALLOWED_ACCENTS = [
@@ -28,12 +29,12 @@ export default function Setup() {
   const [agents, setAgents] = useState<{ id: string; name: string; description?: string; voiceId?: string }[]>([]);
   const [voices, setVoices] = useState<{ id: string; name: string; previewUrl?: string }[]>([]);
 
-  const [agentId, setAgentId] = useState<string>(localStorage.getItem("ELEVENLABS_AGENT_ID") || DEFAULT_AGENT_ID);
+  const [agentId, setAgentId] = useState<string>("");
   const [isCustomAgent, setIsCustomAgent] = useState<boolean>(false);
-  const [voiceId, setVoiceId] = useState<string>(localStorage.getItem("TTS_VOICE_ID") || "9BWtsMINqrJLrRacOk9x");
-  const [studio, setStudio] = useState<string>(localStorage.getItem("SELECTED_STUDIO") || "/studios/studio-1.jpg");
-  const [interviewTitle, setInterviewTitle] = useState<string>(localStorage.getItem("INTERVIEW_TITLE") || "");
-  const [profileUrl, setProfileUrl] = useState<string>(localStorage.getItem("PROFILE_URL") || "");
+  const [voiceId, setVoiceId] = useState<string>("");
+  const [studio, setStudio] = useState<string>("");
+  const [interviewTitle, setInterviewTitle] = useState<string>("");
+  const [profileUrl, setProfileUrl] = useState<string>("");
 
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [loadingVoices, setLoadingVoices] = useState(false);
@@ -43,11 +44,8 @@ export default function Setup() {
   useEffect(() => { if (previewingVoiceId) setVoiceOpen(true); }, [previewingVoiceId]);
   const [agentHint, setAgentHint] = useState<string | null>(null);
 
-  const [studios, setStudios] = useState<string[]>([
-    "/studios/studio-1.jpg",
-    "/studios/studio-2.jpg",
-    "/studios/studio-3.jpg",
-  ]);
+  const [studios, setStudios] = useState<string[]>([]);
+  const [studiosLoading, setStudiosLoading] = useState(true);
   // SEO tags
   useEffect(() => {
     document.title = "Setup Interview – Select Agent, Voice, Studio";
@@ -60,6 +58,13 @@ export default function Setup() {
     link.setAttribute('rel', 'canonical');
     link.setAttribute('href', `${window.location.origin}/setup`);
     document.head.appendChild(link);
+  }, []);
+
+  useEffect(() => {
+    // Clear any previous session selections so the setup is blank
+    ['ELEVENLABS_AGENT_ID','TTS_VOICE_ID','SELECTED_STUDIO','INTERVIEW_TITLE','PROFILE_URL'].forEach((k) => {
+      try { localStorage.removeItem(k); } catch {}
+    });
   }, []);
 
   useEffect(() => {
@@ -76,7 +81,6 @@ export default function Setup() {
         ];
         if (!mounted) return;
         setAgents(merged);
-        if (!agentId && merged[0]?.id) setAgentId(merged[0].id);
       } catch (e) {
         const curated = ELEVEN_AGENTS || [];
         if (!mounted) return;
@@ -130,17 +134,15 @@ export default function Setup() {
         if (error) throw new Error(error.message);
         if (!mounted) return;
         const files = (data || []).filter((f: any) => f && f.name && /\.(png|jpe?g|webp|gif)$/i.test(f.name));
-        if (files.length) {
-          const urls = files
-            .map((f: any) => supabase.storage.from('studio.sample.images').getPublicUrl(f.name).data.publicUrl)
-            .filter(Boolean);
-          if (urls.length) {
-            setStudios(urls);
-            if (!urls.includes(studio)) setStudio(urls[0]);
-          }
-        }
+        const urls = files
+          .map((f: any) => supabase.storage.from('studio.sample.images').getPublicUrl(f.name).data.publicUrl)
+          .filter(Boolean);
+        setStudios(urls);
       } catch (_) {
-        // keep default bundled images
+        // No fallback images; keep empty list
+        setStudios([]);
+      } finally {
+        if (mounted) setStudiosLoading(false);
       }
     })();
 
@@ -374,15 +376,23 @@ export default function Setup() {
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Choose a Studio</h4>
             <div className="grid grid-cols-3 gap-3">
-              {studios.map((src) => (
-                <button
-                  key={src}
-                  className={`relative rounded-lg overflow-hidden border aspect-video ${studio === src ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => setStudio(src)}
-                >
-                  <img src={src} alt="studio background option" loading="lazy" className="w-full h-full object-cover" />
-                </button>
-              ))}
+              {studiosLoading ? (
+                <>
+                  <Skeleton className="w-full aspect-video rounded-lg" />
+                  <Skeleton className="w-full aspect-video rounded-lg" />
+                  <Skeleton className="w-full aspect-video rounded-lg" />
+                </>
+              ) : (
+                studios.map((src) => (
+                  <button
+                    key={src}
+                    className={`relative rounded-lg overflow-hidden border aspect-video ${studio === src ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setStudio(src)}
+                  >
+                    <img src={src} alt="studio background option" loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
