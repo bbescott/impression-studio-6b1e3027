@@ -207,8 +207,7 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
   const startInterview = async () => {
     const topicValue = topic.trim() || "My Interview";
 
-    // Auto-select dating agent for dating-related topics
-    const DATING_AGENT_ID = "agent_3301k288cbm4ejmvsqrxkcnf16vk";
+    // Auto-select agent based on Supabase secrets (dating/general)
     const isDatingTopic = /(\b|\s)(dating|relationship|romance|love)(\b|\s)/i.test(topicValue);
 
     let selectedAgent = localStorage.getItem('ELEVENLABS_AGENT_ID') || undefined;
@@ -217,11 +216,20 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
       localStorage.setItem('ELEVENLABS_AGENT_ID', agentId);
       selectedAgent = agentId;
     }
-    if (isDatingTopic && selectedAgent !== DATING_AGENT_ID) {
-      localStorage.setItem('ELEVENLABS_AGENT_ID', DATING_AGENT_ID);
-      selectedAgent = DATING_AGENT_ID;
-      toast({ title: "Dating topic detected", description: "Using your Dating Interviewer agent.", duration: 2500 });
-    }
+    try {
+      const { data } = await supabase.functions.invoke('get-agent-ids');
+      const datingId = (data as any)?.dating as string | undefined;
+      const generalId = (data as any)?.general as string | undefined;
+      if (isDatingTopic && datingId && selectedAgent !== datingId) {
+        localStorage.setItem('ELEVENLABS_AGENT_ID', datingId);
+        selectedAgent = datingId;
+        toast({ title: "Dating topic detected", description: "Using your Dating Interviewer agent.", duration: 2500 });
+      }
+      if (!selectedAgent && generalId) {
+        localStorage.setItem('ELEVENLABS_AGENT_ID', generalId);
+        selectedAgent = generalId;
+      }
+    } catch (_) { /* non-fatal */ }
 
     // Persist voice and studio selections
     if (voiceId) localStorage.setItem('TTS_VOICE_ID', voiceId);
@@ -319,7 +327,9 @@ export function OnboardingSection({ onGoalSelect }: OnboardingSectionProps) {
                 setIsCustomAgent(false);
                 setAgentId(v);
                 const a = agents.find((x) => x.id === v);
-                if (a?.voiceId) setVoiceId(a.voiceId);
+                if (a?.voiceId && voices.some((vv) => vv.id === a.voiceId)) {
+                  setVoiceId(a.voiceId);
+                }
               }}
             >
               <SelectTrigger aria-label="Select Agent">
