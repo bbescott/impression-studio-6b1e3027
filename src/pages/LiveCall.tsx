@@ -20,6 +20,8 @@ export default function LiveCall() {
   const [isConnected, setIsConnected] = useState(false);
   const [transcript, setTranscript] = useState<string>("");
   const startedRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   // Prepare overrides after we have all setup info
   const overrides = useMemo(() => {
@@ -93,7 +95,19 @@ export default function LiveCall() {
       startedRef.current = true; // prevent multiple attempts
       try {
         setConnecting(true);
-        await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: { facingMode: 'user' }
+        });
+        localStreamRef.current = stream;
+        if (videoRef.current) {
+          try {
+            // @ts-ignore
+            videoRef.current.srcObject = stream as any;
+          } catch {
+            // Fallback no-op
+          }
+        }
         try {
           const { data } = await supabase.functions.invoke('elevenlabs-signed-url', { body: { agentId } });
           const url = (data as any)?.signed_url || (data as any)?.url;
@@ -108,13 +122,21 @@ export default function LiveCall() {
         toast({ title: 'Connected', description: 'You are now in a live call with the AI interviewer.' });
       } catch (e: any) {
         console.error('Failed to start call', e);
-        toast({ title: 'Failed to start', description: e?.message || 'Microphone permission or Agent issue.', variant: 'destructive' });
+        toast({ title: 'Failed to start', description: e?.message || 'Mic/Camera permission or Agent issue.', variant: 'destructive' });
         startedRef.current = false; // allow retry on manual navigation
       } finally {
         setConnecting(false);
       }
     })();
   }, [loading, agentId]);
+
+  // Cleanup local media and session on unmount
+  useEffect(() => {
+    return () => {
+      try { localStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+      try { (conversation as any).endSession?.(); } catch {}
+    };
+  }, []);
 
   const endCall = async () => {
     try { await conversation.endSession(); } catch {}
@@ -142,6 +164,13 @@ export default function LiveCall() {
             <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-[12]">
               {loading ? 'Preparing context…' : (profileSummary || 'No extra context provided.')}
             </p>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-semibold">Your Camera Preview</h4>
+            <div className="rounded-lg overflow-hidden border bg-muted">
+              <video ref={videoRef} className="w-full aspect-video" autoPlay muted playsInline />
+            </div>
           </div>
 
           <div className="space-y-2">
