@@ -147,8 +147,8 @@ export default function LiveCall() {
     <div className="min-h-screen py-10 px-4">
       <div className="container max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-semibold">Live Interview Call</h1>
-          <Button variant="secondary" onClick={endCall}>{isConnected ? 'End Call' : 'Back'}</Button>
+          <h1 className="text-2xl font-display font-semibold">Your Interview Session</h1>
+          <Button variant="secondary" onClick={endCall}>{isConnected ? 'End Session' : 'Back'}</Button>
         </div>
 
         <Card className="p-6 space-y-4">
