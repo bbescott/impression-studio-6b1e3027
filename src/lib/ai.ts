@@ -199,6 +199,17 @@ export async function selectAgentForTopic(params: {
     }
   }
 
+  // Secret override: if dating intent has a mapped agent ID in Supabase secrets, prefer it
+  try {
+    if (target === 'dating') {
+      const { data } = await supabase.functions.invoke('get-agent-ids');
+      const datingId = (data as any)?.dating as string | undefined;
+      if (datingId && agents.some(a => a.id === datingId)) {
+        return { agentId: datingId, reason: 'Secret override: dating agent from Supabase', source: 'rule' };
+      }
+    }
+  } catch (_) { /* non-fatal */ }
+
   // Score agents using tags (explicit or heuristic) and names/descriptions
   const scored = agents.map(a => {
     const hay = `${a.name || ''} ${a.description || ''}`.toLowerCase();
