@@ -210,6 +210,17 @@ export async function selectAgentForTopic(params: {
     }
   } catch (_) { /* non-fatal */ }
 
+  // Default secret override: if no clear intent, prefer DEFAULT_AGENT_ID
+  try {
+    if (target === 'unknown') {
+      const { data } = await supabase.functions.invoke('get-agent-ids');
+      const generalId = (data as any)?.general as string | undefined;
+      if (generalId && agents.some(a => a.id === generalId)) {
+        return { agentId: generalId, reason: 'Secret override: default agent from Supabase', source: 'rule' };
+      }
+    }
+  } catch (_) { /* non-fatal */ }
+
   // Score agents using tags (explicit or heuristic) and names/descriptions
   const scored = agents.map(a => {
     const hay = `${a.name || ''} ${a.description || ''}`.toLowerCase();
@@ -249,6 +260,13 @@ export async function selectAgentForTopic(params: {
     }
     // if rule-based is requested explicitly and no match, fallback to first
     if (strategy === 'rule') {
+      try {
+        const { data } = await supabase.functions.invoke('get-agent-ids');
+        const generalId = (data as any)?.general as string | undefined;
+        if (generalId && agents.some(a => a.id === generalId)) {
+          return { agentId: generalId, reason: 'Fallback to default agent (Supabase secret)', source: 'rule' };
+        }
+      } catch(_) {}
       return { agentId: agents[0].id, reason: 'Fallback to first agent (no clear match)', source: 'rule' };
     }
   }
@@ -262,7 +280,14 @@ export async function selectAgentForTopic(params: {
   const agentId = (data as any)?.agentId as string | undefined;
   const reason = ((data as any)?.reason as string | undefined) || 'Selected by Gemini';
   if (agentId) return { agentId, reason, source: 'gemini' };
-  // last resort
+  // last resort (prefer default secret if available)
+  try {
+    const { data: ids } = await supabase.functions.invoke('get-agent-ids');
+    const generalId = (ids as any)?.general as string | undefined;
+    if (generalId && agents.some(a => a.id === generalId)) {
+      return { agentId: generalId, reason: 'Fallback to default agent (Supabase secret)', source: 'rule' };
+    }
+  } catch(_) {}
   return { agentId: agents[0].id, reason: 'Fallback to first agent', source: 'rule' };
 }
 

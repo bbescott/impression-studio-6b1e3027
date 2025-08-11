@@ -81,6 +81,15 @@ export default function Setup() {
         ];
         if (!mounted) return;
         setAgents(merged);
+        // Prefill default agent from Supabase secret if available
+        try {
+          const { data } = await supabase.functions.invoke('get-agent-ids');
+          const generalId = (data as any)?.general as string | undefined;
+          if (mounted && !agentId && generalId && merged.some((a: any) => a.id === generalId)) {
+            setAgentId(generalId);
+            setAgentHint('Default agent selected (from Supabase secrets)');
+          }
+        } catch (_) { /* non-fatal */ }
       } catch (e) {
         const curated = ELEVEN_AGENTS || [];
         if (!mounted) return;

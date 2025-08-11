@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.fetch-profile-context]
 verify_jwt = false
+
+[functions.get-agent-ids]
+verify_jwt = false
