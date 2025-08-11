@@ -174,8 +174,17 @@ export default function LiveCall() {
 
           <div className="space-y-4">
             <h4 className="font-semibold">Your Camera Preview</h4>
-            <div className="rounded-lg overflow-hidden border bg-muted">
+            <div className="relative rounded-lg overflow-hidden border bg-muted">
               <video ref={videoRef} className="w-full aspect-video" autoPlay muted playsInline />
+              {(connecting || (!isConnected && startedRef.current)) && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-2" aria-live="polite" aria-label="Connecting">
+                    <span className="w-2 h-2 rounded-full bg-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
