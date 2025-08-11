@@ -24,7 +24,7 @@ export default function LiveCall() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const isConnectedRef = useRef(false);
   const connectTimeoutRef = useRef<number | null>(null);
-
+  const [retryCount, setRetryCount] = useState(0);
   // Prepare overrides after we have all setup info
   const overrides = useMemo(() => {
     const baseIntro = `Interview Title: ${title || 'Untitled'}\n` +
@@ -169,7 +169,7 @@ export default function LiveCall() {
         setConnecting(false);
       }
     })();
-  }, [loading, agentId]);
+  }, [loading, agentId, retryCount]);
 
   // Cleanup local media and session on unmount
   useEffect(() => {
@@ -184,17 +184,35 @@ export default function LiveCall() {
     };
   }, []);
 
+  const retryConnect = async () => {
+    try { await (conversation as any).endSession?.(); } catch {}
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+    isConnectedRef.current = false;
+    setIsConnected(false);
+    setConnecting(false);
+    startedRef.current = false;
+    setRetryCount((c) => c + 1);
+    toast({ title: 'Retrying…', description: 'Reinitializing connection.' });
+  };
+
   const endCall = async () => {
     try { await conversation.endSession(); } catch {}
     navigate('/');
   };
-
   return (
     <div className="min-h-screen py-10 px-4">
       <div className="container max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-display font-semibold">Your Interview Session</h1>
-          <Button variant="secondary" onClick={endCall}>{isConnected ? 'End Session' : 'Back'}</Button>
+          <div className="flex items-center gap-2">
+            {!isConnected && (
+              <Button onClick={retryConnect} disabled={connecting}>Retry</Button>
+            )}
+            <Button variant="secondary" onClick={endCall}>{isConnected ? 'End Session' : 'Back'}</Button>
+          </div>
         </div>
         {(connecting || (!isConnected && startedRef.current)) && (
           <div className="rounded-md border bg-muted px-3 py-2 text-sm">Connecting to agent…</div>
