@@ -22,6 +22,8 @@ export default function LiveCall() {
   const startedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const isConnectedRef = useRef(false);
+  const connectTimeoutRef = useRef<number | null>(null);
 
   // Prepare overrides after we have all setup info
   const overrides = useMemo(() => {
@@ -41,8 +43,19 @@ export default function LiveCall() {
 
   const conversation = useConversation({
     overrides,
-    onConnect: () => setIsConnected(true),
-    onDisconnect: () => setIsConnected(false),
+    onConnect: () => {
+      setIsConnected(true);
+      isConnectedRef.current = true;
+      setConnecting(false);
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+    },
+    onDisconnect: () => {
+      setIsConnected(false);
+      isConnectedRef.current = false;
+    },
     onMessage: (msg: any) => {
       try {
         const role = (msg as any)?.role || (msg as any)?.source;
@@ -108,23 +121,51 @@ export default function LiveCall() {
             // Fallback no-op
           }
         }
-        try {
+
+        const trySigned = async () => {
           const { data } = await supabase.functions.invoke('elevenlabs-signed-url', { body: { agentId } });
           const url = (data as any)?.signed_url || (data as any)?.url;
-          if (url) {
-            await (conversation as any).startSession({ url } as any);
-          } else {
-            await conversation.startSession({ agentId });
-          }
-        } catch {
+          if (!url) throw new Error('Missing signed URL');
+          await (conversation as any).startSession({ url } as any);
+          return true; // usedSigned
+        };
+
+        const tryAgentId = async () => {
           await conversation.startSession({ agentId });
+          return false; // usedSigned
+        };
+
+        let usedSigned = false;
+        try {
+          usedSigned = await trySigned();
+        } catch {
+          usedSigned = await tryAgentId();
         }
-        toast({ title: 'Connected', description: 'You are now in a live call with the AI interviewer.' });
+
+        // If connection takes too long, retry with alternate method
+        connectTimeoutRef.current = window.setTimeout(async () => {
+          if (!isConnectedRef.current) {
+            toast({ title: 'Still connecting…', description: 'Retrying with alternate method.', variant: 'default' });
+            try { await (conversation as any).endSession?.(); } catch {}
+            try {
+              if (usedSigned) {
+                await tryAgentId();
+              } else {
+                await trySigned();
+              }
+            } catch (e: any) {
+              console.error('Retry failed', e);
+              toast({ title: 'Failed to connect', description: e?.message || 'Please try again.', variant: 'destructive' });
+              setConnecting(false);
+            }
+          }
+        }, 12000);
+
+        toast({ title: 'Connecting…', description: 'Attempting to connect to the AI interviewer.' });
       } catch (e: any) {
         console.error('Failed to start call', e);
         toast({ title: 'Failed to start', description: e?.message || 'Mic/Camera permission or Agent issue.', variant: 'destructive' });
         startedRef.current = false; // allow retry on manual navigation
-      } finally {
         setConnecting(false);
       }
     })();
@@ -135,6 +176,11 @@ export default function LiveCall() {
     return () => {
       try { localStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
       try { (conversation as any).endSession?.(); } catch {}
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+      isConnectedRef.current = false;
     };
   }, []);
 
