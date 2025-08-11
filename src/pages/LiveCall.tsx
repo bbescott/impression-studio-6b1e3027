@@ -150,6 +150,12 @@ export default function LiveCall() {
           <h1 className="text-2xl font-display font-semibold">Your Interview Session</h1>
           <Button variant="secondary" onClick={endCall}>{isConnected ? 'End Session' : 'Back'}</Button>
         </div>
+        {(connecting || (!isConnected && startedRef.current)) && (
+          <div className="rounded-md border bg-muted px-3 py-2 text-sm">Connecting to agent…</div>
+        )}
+        {isConnected && (
+          <div className="rounded-md border bg-secondary/60 px-3 py-2 text-sm">Connected. You can start speaking.</div>
+        )}
 
         <Card className="p-6 space-y-4">
           <div className="flex items-center justify-between text-sm">
@@ -173,12 +179,7 @@ export default function LiveCall() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <h4 className="font-semibold">Transcript</h4>
-            <div className="h-64 overflow-auto rounded-lg border p-3 bg-card/50">
-              <pre className="text-sm whitespace-pre-wrap">{transcript || (connecting ? 'Connecting to agent…' : 'Say hello to start!')}</pre>
-            </div>
-          </div>
+          {/* Transcript is captured silently for post-processing; hidden from UI */}
         </Card>
       </div>
     </div>
