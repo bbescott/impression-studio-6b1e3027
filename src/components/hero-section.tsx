@@ -51,6 +51,9 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
               <Play className="w-5 h-5 transition-transform group-hover:scale-110" />
               Start Recording
             </Button>
+            <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
+              Sign in or create an account
+            </Link>
           </div>
           
           {/* Feature Cards */}
