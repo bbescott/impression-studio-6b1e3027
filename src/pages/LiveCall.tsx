@@ -16,6 +16,7 @@ export default function LiveCall() {
   const [profileUrl, setProfileUrl] = useState<string>("");
   const [prepNotes, setPrepNotes] = useState<string>("");
   const [profileSummary, setProfileSummary] = useState<string>("");
+  const [creatorSummary, setCreatorSummary] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -31,17 +32,20 @@ export default function LiveCall() {
     const baseIntro = `Interview Title: ${title || 'Untitled'}\n` +
       (profileUrl ? `Reference URL: ${profileUrl}\n` : "") +
       (prepNotes ? `Preparation Notes (use as context):\n${prepNotes}\n` : "") +
+      (creatorSummary ? `Creator Profile (use as context):\n${creatorSummary}\n` : "") +
       (profileSummary ? `Profile Summary (use as context):\n${profileSummary}\n` : "");
     const prompt = `${baseIntro}\nInstructions: You are an expert interviewer. Conduct a natural voice conversation. Ask one question at a time. Adapt based on answers. Wrap up when satisfied (no fixed number of questions). Avoid reading context verbatim; use it to personalize.`;
+    const prefaceSrc = creatorSummary || profileSummary || "";
+    const prefaceLine = prefaceSrc ? `Before we begin, here’s what I gathered: ${prefaceSrc.split('\n')[0].slice(0, 160)}. ` : "";
     return {
       agent: {
         prompt: { prompt },
-        firstMessage: `Hi! Let’s begin our interview about “${title || 'your topic'}”. I’ll guide you with a few questions. Ready?`,
+        firstMessage: `Hi! ${prefaceLine}Let’s begin our interview about “${title || 'your topic'}”. I’ll guide you with a few questions. Ready?`,
         language: 'en',
       },
       tts: { voiceId },
     } as any;
-  }, [title, profileUrl, prepNotes, profileSummary, voiceId]);
+  }, [title, profileUrl, prepNotes, profileSummary, creatorSummary, voiceId]);
 
   const conversation = useConversation({
     overrides,
@@ -86,6 +90,33 @@ export default function LiveCall() {
         const p = localStorage.getItem('PROFILE_URL') || '';
         const n = localStorage.getItem('PREP_NOTES') || '';
         setAgentId(a); setVoiceId(v); setTitle(t); setProfileUrl(p); setPrepNotes(n);
+        // Fetch creator profile from Supabase
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const uid = session?.user?.id;
+          if (uid) {
+            const { data: prof } = await supabase
+              .from('creator_profiles')
+              .select('bio, goals, niche, audience, tone, brand_keywords, ctas')
+              .eq('user_id', uid)
+              .maybeSingle();
+            if (prof) {
+              const bullets: string[] = [];
+              if ((prof as any).bio) bullets.push(String((prof as any).bio));
+              const mini: string[] = [];
+              if ((prof as any).goals) mini.push(`Goals: ${(prof as any).goals}`);
+              if ((prof as any).niche) mini.push(`Niche: ${(prof as any).niche}`);
+              if ((prof as any).audience) mini.push(`Audience: ${(prof as any).audience}`);
+              if ((prof as any).tone) mini.push(`Tone: ${(prof as any).tone}`);
+              if (Array.isArray((prof as any).brand_keywords) && (prof as any).brand_keywords.length) {
+                mini.push(`Keywords: ${((prof as any).brand_keywords as string[]).slice(0,5).join(', ')}`);
+              }
+              const combined = [...bullets, mini.join(' · ')].filter(Boolean).join(' — ');
+              setCreatorSummary(combined.slice(0, 400));
+            }
+          }
+        } catch(_) {}
+        // Fetch external profile summary if URL provided
         if (p) {
           const { data, error } = await supabase.functions.invoke('fetch-profile-context', { body: { url: p, title: t } });
           if (error) throw new Error(error.message);
@@ -246,13 +277,19 @@ export default function LiveCall() {
                     <div className="whitespace-pre-line">{prepNotes}</div>
                   </div>
                 )}
+                {creatorSummary && (
+                  <div>
+                    <p className="font-medium">Creator Profile</p>
+                    <div className="whitespace-pre-line">{creatorSummary}</div>
+                  </div>
+                )}
                 {profileSummary && (
                   <div>
                     <p className="font-medium">Profile Summary</p>
                     <div className="whitespace-pre-line">{profileSummary}</div>
                   </div>
                 )}
-                {!prepNotes && !profileSummary && (
+                {!prepNotes && !profileSummary && !creatorSummary && (
                   <p>No extra context provided.</p>
                 )}
               </div>
