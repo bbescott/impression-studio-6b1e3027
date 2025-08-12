@@ -15,6 +15,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [linkedinImageUrl, setLinkedinImageUrl] = useState<string | null>(null);
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const redirectTarget = params.get('redirect') || '/profile';
@@ -78,6 +79,37 @@ export default function Auth() {
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Fetch best available LinkedIn button graphic from Supabase Storage (Buttons bucket)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.storage.from('Buttons').list('', { limit: 100, search: 'linkedin' });
+        if (error) throw error;
+        const items = (data ?? []).filter((i) => !i.name.endsWith('/'));
+        if (items.length === 0) return;
+        const score = (name: string) => {
+          const n = name.toLowerCase();
+          let s = 0;
+          if (/(^|[^a-z])(button|sign|cta)([^a-z]|$)/.test(n)) s += 5; // prefer full button assets
+          if (n.endsWith('.svg')) s += 3;
+          else if (n.endsWith('.png')) s += 2;
+          else if (n.endsWith('.jpg') || n.endsWith('.jpeg')) s += 1;
+          if (/(^|[^a-z])(blue|brand)([^a-z]|$)/.test(n)) s += 1; // slight boost for brand blue
+          return s;
+        };
+        items.sort((a, b) => score(b.name) - score(a.name));
+        const chosen = items[0];
+        const path = chosen.name;
+        const { data: pub } = supabase.storage.from('Buttons').getPublicUrl(path);
+        if (!cancelled) setLinkedinImageUrl(pub.publicUrl);
+      } catch {
+        // If anything fails, we gracefully fallback to text-only button
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -183,8 +215,25 @@ export default function Auth() {
               <span className="px-2 text-xs text-muted-foreground">or</span>
             </div>
 
-            <Button type="button" variant="secondary" className="w-full" onClick={handleLinkedIn} disabled={initializing}>
-              Continue with LinkedIn
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={handleLinkedIn}
+              disabled={initializing}
+              aria-label="Continue with LinkedIn"
+            >
+              {linkedinImageUrl ? (
+                <img
+                  src={linkedinImageUrl}
+                  alt="Continue with LinkedIn"
+                  loading="lazy"
+                  className="h-5 w-auto"
+                  onError={() => setLinkedinImageUrl(null)}
+                />
+              ) : (
+                "Continue with LinkedIn"
+              )}
             </Button>
           </Card>
 
