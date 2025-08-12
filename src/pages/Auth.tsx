@@ -163,6 +163,8 @@ export default function Auth() {
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             <Link to="/" className="underline underline-offset-4 hover:text-foreground">Back to home</Link>
+            <span className="mx-2">·</span>
+            <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">Privacy Policy</Link>
           </p>
         </div>
       </section>

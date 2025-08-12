@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Setup from "./pages/Setup";
 import LiveCall from "./pages/LiveCall";
 import Auth from "./pages/Auth";
+import Privacy from "./pages/Privacy";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/call" element={<LiveCall />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/privacy" element={<Privacy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
