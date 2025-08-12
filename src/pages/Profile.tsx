@@ -44,7 +44,7 @@ export default function Profile() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        navigate('/auth');
+        navigate('/auth?redirect=/profile');
         return;
       }
       setUserId(session.user.id);
