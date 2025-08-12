@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEVEN_AGENTS } from "@/config/elevenlabs";
 import { selectAgentForTopic } from "@/lib/ai";
+import { cleanupAuthState } from "@/utils/auth-cleanup";
 
 
 const PREVIEW_TEXT = "Hello there, I am your interviewer.";
@@ -246,6 +247,24 @@ export default function Setup() {
     }
   };
 
+  const wantsLinkedIn = /\blinkedin\.com\b/i.test(profileUrl);
+
+  const handleLinkedInSignIn = async () => {
+    try {
+      cleanupAuthState();
+      try { await supabase.auth.signOut({ scope: 'global' }); } catch {}
+      const redirectTo = `${window.location.origin}/setup`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'linkedin_oidc',
+        options: { redirectTo }
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'LinkedIn sign-in failed', description: e?.message || 'Try again later', variant: 'destructive' });
+    }
+  };
+
   const handleContinue = () => {
     if (!agentId || (isCustomAgent && agentId.trim().length < 5)) {
       toast({ title: 'Select a valid agent', description: 'Choose from the list or paste a valid Agent ID.', variant: 'destructive' });
@@ -291,6 +310,15 @@ export default function Setup() {
             <p className="text-xs text-muted-foreground">
               Add a relevant link to help tailor questions. Examples: LinkedIn, personal website, resume link, or a dating profile (Hinge/Tinder/Bumble).
             </p>
+            {wantsLinkedIn && (
+              <div className="rounded-md border p-3 flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Sign in with LinkedIn</p>
+                  <p className="text-xs text-muted-foreground">This link appears private. Connect LinkedIn to let the agent review your profile summary.</p>
+                </div>
+                <Button type="button" size="sm" onClick={handleLinkedInSignIn}>Connect</Button>
+              </div>
+            )}
           </div>
           <div className="space-y-3">
             <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Preparation Notes (optional)</h4>
