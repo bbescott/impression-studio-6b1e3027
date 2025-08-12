@@ -62,6 +62,22 @@ export default function Auth() {
     };
   }, []);
 
+  // Detect auth token changes from other tabs/windows (e.g., OAuth popup/new tab)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith('supabase.auth.') || e.key.includes('sb-')) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            window.location.href = "/profile";
+          }
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
