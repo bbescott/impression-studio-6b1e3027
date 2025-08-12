@@ -263,11 +263,14 @@ export default function Setup() {
       cleanupAuthState();
       try { await supabase.auth.signOut({ scope: 'global' }); } catch {}
       const redirectTo = `${window.location.origin}/setup`;
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'linkedin_oidc',
-        options: { redirectTo }
+        options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error) throw error;
+      if (data?.url) {
+        (window.top || window).location.href = data.url;
+      }
     } catch (e: any) {
       console.error(e);
       toast({ title: 'LinkedIn sign-in failed', description: e?.message || 'Try again later', variant: 'destructive' });

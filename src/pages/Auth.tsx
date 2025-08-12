@@ -99,12 +99,16 @@ export default function Auth() {
     try {
       cleanupAuthState();
       try { await supabase.auth.signOut({ scope: "global" }); } catch {}
-      const supabaseUrl = "https://pxohrtfhhltvkypyemit.supabase.co";
       const redirectTo = `${window.location.origin}/profile`;
-      const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=linkedin_oidc&redirect_to=${encodeURIComponent(redirectTo)}`;
-      // Force top-level navigation to avoid iframe blocking by LinkedIn
-      window.open(authUrl, "_top");
-      return;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "linkedin_oidc",
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        // Force top-level navigation to avoid iframe blocking by LinkedIn
+        (window.top || window).location.href = data.url;
+      }
     } catch (err: any) {
       toast({ title: "LinkedIn sign-in failed", description: err?.message || "Please try again.", variant: "destructive" });
     }
