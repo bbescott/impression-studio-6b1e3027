@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +36,7 @@ export default function Setup() {
   const [studio, setStudio] = useState<string>("");
   const [interviewTitle, setInterviewTitle] = useState<string>("");
   const [profileUrl, setProfileUrl] = useState<string>("");
-
+  const [prepNotes, setPrepNotes] = useState<string>("");
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesPage, setVoicesPage] = useState<number>(1);
@@ -62,7 +63,7 @@ export default function Setup() {
 
   useEffect(() => {
     // Clear any previous session selections so the setup is blank
-    ['ELEVENLABS_AGENT_ID','TTS_VOICE_ID','SELECTED_STUDIO','INTERVIEW_TITLE','PROFILE_URL'].forEach((k) => {
+    ['ELEVENLABS_AGENT_ID','TTS_VOICE_ID','SELECTED_STUDIO','INTERVIEW_TITLE','PROFILE_URL','PREP_NOTES'].forEach((k) => {
       try { localStorage.removeItem(k); } catch {}
     });
   }, []);
@@ -255,6 +256,7 @@ export default function Setup() {
     localStorage.setItem('SELECTED_STUDIO', studio);
     localStorage.setItem('INTERVIEW_TITLE', interviewTitle);
     localStorage.setItem('PROFILE_URL', profileUrl);
+    localStorage.setItem('PREP_NOTES', prepNotes);
     toast({ title: 'Setup saved', description: 'Starting your live interview…' });
     navigate('/call');
   };
@@ -289,6 +291,16 @@ export default function Setup() {
             <p className="text-xs text-muted-foreground">
               Add a relevant link to help tailor questions. Examples: LinkedIn, personal website, resume link, or a dating profile (Hinge/Tinder/Bumble).
             </p>
+          </div>
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Preparation Notes (optional)</h4>
+            <Textarea
+              value={prepNotes}
+              onChange={(e) => setPrepNotes(e.target.value)}
+              placeholder="Paste any job description, brief, bullet points, or links to review before the interview."
+              aria-label="Preparation notes"
+            />
+            <p className="text-xs text-muted-foreground">We’ll quietly use this to tailor the interview. Links will be fetched if accessible; no message if not.</p>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">

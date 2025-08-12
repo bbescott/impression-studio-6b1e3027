@@ -14,6 +14,7 @@ export default function LiveCall() {
   const [voiceId, setVoiceId] = useState<string>("9BWtsMINqrJLrRacOk9x");
   const [title, setTitle] = useState<string>("");
   const [profileUrl, setProfileUrl] = useState<string>("");
+  const [prepNotes, setPrepNotes] = useState<string>("");
   const [profileSummary, setProfileSummary] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -29,6 +30,7 @@ export default function LiveCall() {
   const overrides = useMemo(() => {
     const baseIntro = `Interview Title: ${title || 'Untitled'}\n` +
       (profileUrl ? `Reference URL: ${profileUrl}\n` : "") +
+      (prepNotes ? `Preparation Notes (use as context):\n${prepNotes}\n` : "") +
       (profileSummary ? `Profile Summary (use as context):\n${profileSummary}\n` : "");
     const prompt = `${baseIntro}\nInstructions: You are an expert interviewer. Conduct a natural voice conversation. Ask one question at a time. Adapt based on answers. Wrap up when satisfied (no fixed number of questions). Avoid reading context verbatim; use it to personalize.`;
     return {
@@ -39,7 +41,7 @@ export default function LiveCall() {
       },
       tts: { voiceId },
     } as any;
-  }, [title, profileUrl, profileSummary, voiceId]);
+  }, [title, profileUrl, prepNotes, profileSummary, voiceId]);
 
   const conversation = useConversation({
     overrides,
@@ -82,7 +84,8 @@ export default function LiveCall() {
         const v = localStorage.getItem('TTS_VOICE_ID') || '9BWtsMINqrJLrRacOk9x';
         const t = localStorage.getItem('INTERVIEW_TITLE') || '';
         const p = localStorage.getItem('PROFILE_URL') || '';
-        setAgentId(a); setVoiceId(v); setTitle(t); setProfileUrl(p);
+        const n = localStorage.getItem('PREP_NOTES') || '';
+        setAgentId(a); setVoiceId(v); setTitle(t); setProfileUrl(p); setPrepNotes(n);
         if (p) {
           const { data, error } = await supabase.functions.invoke('fetch-profile-context', { body: { url: p, title: t } });
           if (error) throw new Error(error.message);
@@ -231,9 +234,27 @@ export default function LiveCall() {
             <p className="text-muted-foreground break-all">Profile URL: {profileUrl}</p>
           )}
           <div className="rounded-lg p-3 bg-secondary/60 border">
-            <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-[12]">
-              {loading ? 'Preparing context…' : (profileSummary || 'No extra context provided.')}
-            </p>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Preparing context…</p>
+            ) : (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {prepNotes && (
+                  <div>
+                    <p className="font-medium">Preparation Notes</p>
+                    <div className="whitespace-pre-line">{prepNotes}</div>
+                  </div>
+                )}
+                {profileSummary && (
+                  <div>
+                    <p className="font-medium">Profile Summary</p>
+                    <div className="whitespace-pre-line">{profileSummary}</div>
+                  </div>
+                )}
+                {!prepNotes && !profileSummary && (
+                  <p>No extra context provided.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
