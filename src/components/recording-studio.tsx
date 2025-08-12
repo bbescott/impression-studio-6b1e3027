@@ -339,6 +339,14 @@ const [hasPermissions, setHasPermissions] = useState(false);
   };
 
 const startRecording = async () => {
+    // Require auth before recording
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      toast({ title: 'Please sign in', description: 'Sign in to record and save your answers.' });
+      const current = `${window.location.pathname}${window.location.search}`;
+      window.location.href = `/auth?redirect=${encodeURIComponent(current || '/setup')}`;
+      return;
+    }
     if (!mediaStream) {
       console.error("No media stream available for recording");
       return;

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cleanupAuthState } from "@/utils/auth-cleanup";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Auth() {
   const { toast } = useToast();
@@ -15,7 +15,9 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const redirectTarget = params.get('redirect') || '/profile';
   // SEO
   useEffect(() => {
     const title = mode === "signin" ? "Sign in | Impression Studio" : "Create account | Impression Studio";
@@ -44,14 +46,14 @@ export default function Auth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setTimeout(() => {
-          window.location.href = "/profile";
+          window.location.href = redirectTarget;
         }, 0);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        window.location.href = "/profile";
+        window.location.href = redirectTarget;
       } else {
         setInitializing(false);
       }
@@ -69,7 +71,7 @@ export default function Auth() {
       if (e.key.startsWith('supabase.auth.') || e.key.includes('sb-')) {
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (session?.user) {
-            window.location.href = "/profile";
+            window.location.href = redirectTarget;
           }
         }).catch(() => {});
       }
@@ -89,10 +91,10 @@ export default function Auth() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (data.user) {
-          window.location.href = "/profile";
+          window.location.href = redirectTarget;
         }
       } else {
-        const redirectUrl = `${window.location.origin}/`;
+        const redirectUrl = `${window.location.origin}${redirectTarget}`;
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -115,24 +117,16 @@ export default function Auth() {
     try {
       cleanupAuthState();
       try { await supabase.auth.signOut({ scope: "global" }); } catch {}
-      const redirectTo = `${window.location.origin}/profile`;
+      const redirectTo = `${window.location.origin}${redirectTarget}`;
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "linkedin_oidc",
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error) throw error;
       if (data?.url) {
-        try {
-          if (window.top && window.top !== window) {
-            window.top.location.assign(data.url);
-          } else {
-            window.location.assign(data.url);
-          }
-        } catch {
-          const opened = window.open(data.url, "_blank", "noopener,noreferrer");
-          if (!opened) {
-            window.location.href = data.url;
-          }
+        const opened = window.open(data.url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          window.location.href = data.url;
         }
       }
     } catch (err: any) {

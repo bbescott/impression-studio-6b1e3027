@@ -103,6 +103,8 @@ export default function LiveCall() {
   // Auto-start call when setup is loaded; run only once
   useEffect(() => {
     (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { navigate(`/auth?redirect=/setup`); return; }
       if (loading || startedRef.current) return;
       if (!agentId) {
         toast({ title: 'Agent missing', description: 'Select an ElevenLabs agent in Setup.', variant: 'destructive' });
