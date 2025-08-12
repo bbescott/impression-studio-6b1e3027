@@ -78,6 +78,39 @@ export default function Setup() {
     }).catch(() => setIsLinkedInAuth(false));
   }, []);
 
+  // Listen for auth changes from LinkedIn OAuth in another tab and update instantly without reload
+  useEffect(() => {
+    const handleSessionUpdate = () => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setIsLinkedInAuth(true);
+        }
+      }).catch(() => {});
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsLinkedInAuth(true);
+      }
+    });
+
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith('supabase.auth.') || e.key.includes('sb-')) {
+        handleSessionUpdate();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    // Initial sync in case OAuth just finished and session already exists
+    handleSessionUpdate();
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
