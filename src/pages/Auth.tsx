@@ -118,17 +118,12 @@ export default function Auth() {
       cleanupAuthState();
       try { await supabase.auth.signOut({ scope: "global" }); } catch {}
       const redirectTo = `${window.location.origin}${redirectTarget}`;
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "linkedin_oidc",
-        options: { redirectTo, skipBrowserRedirect: true },
+        options: { redirectTo },
       });
       if (error) throw error;
-      if (data?.url) {
-        const opened = window.open(data.url, "_blank", "noopener,noreferrer");
-        if (!opened) {
-          window.location.href = data.url;
-        }
-      }
+      // When skipBrowserRedirect is not set, Supabase will handle the redirect in this tab.
     } catch (err: any) {
       toast({ title: "LinkedIn sign-in failed", description: err?.message || "Please try again.", variant: "destructive" });
     }
