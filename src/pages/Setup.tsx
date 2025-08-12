@@ -269,7 +269,18 @@ export default function Setup() {
       });
       if (error) throw error;
       if (data?.url) {
-        (window.top || window).location.href = data.url;
+        try {
+          if (window.top && window.top !== window) {
+            window.top.location.assign(data.url);
+          } else {
+            window.location.assign(data.url);
+          }
+        } catch {
+          const opened = window.open(data.url, "_blank", "noopener,noreferrer");
+          if (!opened) {
+            window.location.href = data.url;
+          }
+        }
       }
     } catch (e: any) {
       console.error(e);

@@ -106,8 +106,18 @@ export default function Auth() {
       });
       if (error) throw error;
       if (data?.url) {
-        // Force top-level navigation to avoid iframe blocking by LinkedIn
-        (window.top || window).location.href = data.url;
+        try {
+          if (window.top && window.top !== window) {
+            window.top.location.assign(data.url);
+          } else {
+            window.location.assign(data.url);
+          }
+        } catch {
+          const opened = window.open(data.url, "_blank", "noopener,noreferrer");
+          if (!opened) {
+            window.location.href = data.url;
+          }
+        }
       }
     } catch (err: any) {
       toast({ title: "LinkedIn sign-in failed", description: err?.message || "Please try again.", variant: "destructive" });
