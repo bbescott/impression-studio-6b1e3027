@@ -85,7 +85,9 @@ const [hasPermissions, setHasPermissions] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionIdRef = useRef<string>(crypto.randomUUID());
+  const initialSessionId = typeof window !== 'undefined' ? (localStorage.getItem('RESUME_SESSION_ID') || crypto.randomUUID()) : crypto.randomUUID();
+  const sessionIdRef = useRef<string>(initialSessionId);
+  useEffect(() => { try { localStorage.setItem('RESUME_SESSION_ID', sessionIdRef.current); } catch {} }, []);
 
   useEffect(() => {
     requestPermissions();

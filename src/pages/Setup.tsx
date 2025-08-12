@@ -48,6 +48,7 @@ export default function Setup() {
 
   const [studios, setStudios] = useState<string[]>([]);
   const [studiosLoading, setStudiosLoading] = useState(true);
+  const [isLinkedInAuth, setIsLinkedInAuth] = useState(false);
   // SEO tags
   useEffect(() => {
     document.title = "Setup Interview – Select Agent, Voice, Studio";
@@ -67,6 +68,14 @@ export default function Setup() {
     ['ELEVENLABS_AGENT_ID','TTS_VOICE_ID','SELECTED_STUDIO','INTERVIEW_TITLE','PROFILE_URL','PREP_NOTES'].forEach((k) => {
       try { localStorage.removeItem(k); } catch {}
     });
+  }, []);
+
+  useEffect(() => {
+    // Check auth provider to determine if LinkedIn is already connected
+    supabase.auth.getUser().then(({ data }) => {
+      const providers = (data.user as any)?.app_metadata?.providers as string[] | undefined;
+      setIsLinkedInAuth(!!providers?.includes('linkedin_oidc'));
+    }).catch(() => setIsLinkedInAuth(false));
   }, []);
 
   useEffect(() => {
@@ -310,7 +319,7 @@ export default function Setup() {
             <p className="text-xs text-muted-foreground">
               Add a relevant link to help tailor questions. Examples: LinkedIn, personal website, resume link, or a dating profile (Hinge/Tinder/Bumble).
             </p>
-            {wantsLinkedIn && (
+            {wantsLinkedIn && !isLinkedInAuth && (
               <div className="rounded-md border p-3 flex items-center justify-between gap-3">
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">Sign in with LinkedIn</p>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { HeroSection } from "@/components/hero-section";
 import { RecordingStudio } from "@/components/recording-studio";
 import { ProcessingSection } from "@/components/processing-section";
 import { generateInterviewPlanWithGemini } from "@/lib/ai";
+import { supabase } from "@/integrations/supabase/client";
 
 type AppState = 'hero' | 'recording' | 'processing';
 
@@ -19,7 +20,18 @@ const Index = () => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const [questions, setQuestions] = useState<string[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session?.user);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleGetStarted = () => {
     navigate('/setup');
@@ -67,7 +79,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {currentState === 'hero' && (
-        <HeroSection onGetStarted={handleGetStarted} />
+        <HeroSection onGetStarted={handleGetStarted} isAuthenticated={isAuthenticated} />
       )}
       
       {currentState === 'recording' && (

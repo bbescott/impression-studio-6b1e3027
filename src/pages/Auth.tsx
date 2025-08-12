@@ -44,14 +44,14 @@ export default function Auth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setTimeout(() => {
-          window.location.href = "/";
+          window.location.href = "/profile";
         }, 0);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        window.location.href = "/";
+        window.location.href = "/profile";
       } else {
         setInitializing(false);
       }
@@ -73,7 +73,7 @@ export default function Auth() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (data.user) {
-          window.location.href = "/";
+          window.location.href = "/profile";
         }
       } else {
         const redirectUrl = `${window.location.origin}/`;
@@ -100,7 +100,7 @@ export default function Auth() {
       cleanupAuthState();
       try { await supabase.auth.signOut({ scope: "global" }); } catch {}
       const supabaseUrl = "https://pxohrtfhhltvkypyemit.supabase.co";
-      const redirectTo = `${window.location.origin}/`;
+      const redirectTo = `${window.location.origin}/profile`;
       const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=linkedin_oidc&redirect_to=${encodeURIComponent(redirectTo)}`;
       // Force top-level navigation to avoid iframe blocking by LinkedIn
       window.open(authUrl, "_top");

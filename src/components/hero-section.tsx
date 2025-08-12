@@ -6,9 +6,10 @@ import { Link } from "react-router-dom";
 
 interface HeroSectionProps {
   onGetStarted: () => void;
+  isAuthenticated?: boolean;
 }
 
-export function HeroSection({ onGetStarted }: HeroSectionProps) {
+export function HeroSection({ onGetStarted, isAuthenticated = false }: HeroSectionProps) {
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
@@ -51,9 +52,15 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
               <Play className="w-5 h-5 transition-transform group-hover:scale-110" />
               Start Recording
             </Button>
-            <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
-              Sign in or create an account
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/profile" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
+                Go to your profile
+              </Link>
+            ) : (
+              <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
+                Sign in or create an account
+              </Link>
+            )}
           </div>
           
           {/* Feature Cards */}
