@@ -14,6 +14,155 @@ export type Database = {
   }
   public: {
     Tables: {
+      creator_profiles: {
+        Row: {
+          audience: string | null
+          auto_generation_enabled: boolean
+          bio: string | null
+          brand_keywords: string[] | null
+          cadence: string | null
+          created_at: string
+          ctas: string[] | null
+          do_donts: Json | null
+          goals: string | null
+          links: Json | null
+          niche: string | null
+          platform_prefs: Json | null
+          tone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audience?: string | null
+          auto_generation_enabled?: boolean
+          bio?: string | null
+          brand_keywords?: string[] | null
+          cadence?: string | null
+          created_at?: string
+          ctas?: string[] | null
+          do_donts?: Json | null
+          goals?: string | null
+          links?: Json | null
+          niche?: string | null
+          platform_prefs?: Json | null
+          tone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audience?: string | null
+          auto_generation_enabled?: boolean
+          bio?: string | null
+          brand_keywords?: string[] | null
+          cadence?: string | null
+          created_at?: string
+          ctas?: string[] | null
+          do_donts?: Json | null
+          goals?: string | null
+          links?: Json | null
+          niche?: string | null
+          platform_prefs?: Json | null
+          tone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_posts: {
+        Row: {
+          asset_id: string | null
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          platform: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          platform?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          platform?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "library_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_assets: {
+        Row: {
+          audio_path: string | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          metadata: Json | null
+          session_id: string | null
+          thumbnail_path: string | null
+          title: string | null
+          type: string
+          updated_at: string
+          user_id: string
+          video_path: string | null
+        }
+        Insert: {
+          audio_path?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          thumbnail_path?: string | null
+          title?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+          video_path?: string | null
+        }
+        Update: {
+          audio_path?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          thumbnail_path?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+          video_path?: string | null
+        }
+        Relationships: []
+      }
       transcripts: {
         Row: {
           audio_path: string | null
